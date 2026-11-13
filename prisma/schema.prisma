@@ -1,0 +1,401 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  STAFF
+  TEACHER
+}
+
+enum DocumentStatus {
+  DRAFT
+  SUBMITTED
+  REVIEW
+  APPROVED
+  REJECTED
+  READY
+}
+
+enum DocumentType {
+  CERTIFICATE
+  APPLICATION
+  CONSULTATION
+  OTHER
+}
+
+enum DocumentDelivery {
+  EMAIL
+  PICKUP
+  POSTAL
+}
+
+enum NotificationType {
+  SCHEDULE
+  GRADE
+  DEADLINE
+  DOCUMENT
+  ACHIEVEMENT
+  ANNOUNCEMENT
+  TEACHER_REPLY
+}
+
+enum QuestKind {
+  PERSONAL
+  LAB
+  CREDIT
+}
+
+enum XpKind {
+  PERSONAL
+  LAB
+  CREDIT
+  STAGE
+  SEMESTER
+}
+
+model User {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  login              String                  @unique
+  name               String
+  passwordHash       String
+  role               Role                    @default(STUDENT)
+  student            StudentProfile?
+  staff              StaffProfile?
+  documents          DocumentRequest[]
+  notifications      Notification[]
+  history            DocumentStatusHistory[]
+  audit              AuditLog[]
+  taughtSubjects     Subject[]               @relation("Instructor")
+  checkpointMessages CheckpointMessage[]
+}
+
+model Faculty {
+  id       String           @id @default(uuid()) @db.Uuid
+  name     String           @unique
+  students StudentProfile[]
+  staff    StaffProfile[]
+}
+
+model Group {
+  id            String           @id @default(uuid()) @db.Uuid
+  name          String           @unique
+  students      StudentProfile[]
+  schedule      ScheduleEvent[]
+  announcements Announcement[]
+}
+
+model StudentProfile {
+  userId       String                    @id @db.Uuid
+  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupId      String                    @db.Uuid
+  group        Group                     @relation(fields: [groupId], references: [id])
+  facultyId    String                    @db.Uuid
+  faculty      Faculty                   @relation(fields: [facultyId], references: [id])
+  year         Int
+  program      String
+  academicYear String
+  theme        String                    @default("dark")
+  animations   Boolean                   @default(true)
+  reminders    Boolean                   @default(true)
+  enrollments  Enrollment[]
+  quests       Quest[]
+  progress     StudentSemesterProgress[]
+  xp           XpEvent[]
+  achievements StudentAchievement[]
+
+  @@index([groupId])
+  @@index([facultyId])
+}
+
+model StaffProfile {
+  userId    String   @id @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facultyId String?  @db.Uuid
+  faculty   Faculty? @relation(fields: [facultyId], references: [id])
+}
+
+model Subject {
+  id           String          @id @default(uuid()) @db.Uuid
+  title        String
+  teacher      String
+  credits      Int
+  color        String
+  enrollments  Enrollment[]
+  schedule     ScheduleEvent[]
+  instructorId String?         @db.Uuid
+  instructor   User?           @relation("Instructor", fields: [instructorId], references: [id], onDelete: SetNull)
+
+  @@index([instructorId])
+}
+
+model Enrollment {
+  id           String         @id @default(uuid()) @db.Uuid
+  studentId    String         @db.Uuid
+  student      StudentProfile @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  subjectId    String         @db.Uuid
+  subject      Subject        @relation(fields: [subjectId], references: [id])
+  finalGrade   Int?
+  creditPassed Boolean        @default(false)
+  grades       Grade[]
+  assessments  Assessment[]
+  exams        Exam[]
+  quests       Quest[]
+
+  @@unique([studentId, subjectId])
+}
+
+model ScheduleEvent {
+  id              String           @id @default(uuid()) @db.Uuid
+  groupId         String           @db.Uuid
+  group           Group            @relation(fields: [groupId], references: [id])
+  subjectId       String           @db.Uuid
+  subject         Subject          @relation(fields: [subjectId], references: [id])
+  kind            String
+  start           DateTime
+  end             DateTime
+  room            String
+  building        String?
+  teacherOverride String?
+  cancelled       Boolean          @default(false)
+  revision        Int              @default(0)
+  format          String
+  note            String?
+  changes         ScheduleChange[]
+
+  @@index([groupId, start])
+}
+
+model ScheduleChange {
+  id        String        @id @default(uuid()) @db.Uuid
+  eventId   String        @db.Uuid
+  event     ScheduleEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  previous  Json
+  current   Json
+  reason    String
+  createdAt DateTime      @default(now())
+
+  @@index([eventId, createdAt])
+}
+
+model Grade {
+  id           String     @id @default(uuid()) @db.Uuid
+  enrollmentId String     @db.Uuid
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  title        String
+  value        Int
+  points       Int
+  maxPoints    Int
+  weight       Int        @default(1)
+  assessedAt   DateTime
+
+  @@index([enrollmentId, assessedAt])
+}
+
+model Assessment {
+  id           String              @id @default(uuid()) @db.Uuid
+  enrollmentId String              @db.Uuid
+  enrollment   Enrollment          @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  stageId      String              @db.Uuid
+  stage        SemesterStage       @relation(fields: [stageId], references: [id])
+  title        String
+  due          DateTime
+  passedAt     DateTime?
+  weight       Int                 @default(1)
+  instructions String?
+  messages     CheckpointMessage[]
+  quest        Quest?
+
+  @@index([enrollmentId, due])
+}
+
+model CheckpointMessage {
+  id           String     @id @default(uuid()) @db.Uuid
+  assessmentId String     @db.Uuid
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  authorId     String     @db.Uuid
+  author       User       @relation(fields: [authorId], references: [id])
+  body         String
+  createdAt    DateTime   @default(now())
+
+  @@index([assessmentId, createdAt])
+  @@index([authorId])
+}
+
+model Exam {
+  id           String     @id @default(uuid()) @db.Uuid
+  enrollmentId String     @db.Uuid
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  start        DateTime
+  room         String
+  kind         String
+
+  @@index([enrollmentId, start])
+}
+
+model Quest {
+  id           String           @id @default(uuid()) @db.Uuid
+  studentId    String           @db.Uuid
+  student      StudentProfile   @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  enrollmentId String           @db.Uuid
+  enrollment   Enrollment       @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  assessmentId String?          @unique @db.Uuid
+  assessment   Assessment?      @relation(fields: [assessmentId], references: [id])
+  title        String
+  description  String
+  due          DateTime
+  kind         QuestKind
+  completion   QuestCompletion?
+
+  @@index([studentId, due])
+}
+
+model QuestCompletion {
+  questId     String   @id @db.Uuid
+  quest       Quest    @relation(fields: [questId], references: [id], onDelete: Cascade)
+  completedAt DateTime @default(now())
+  confirmedBy String
+}
+
+model SemesterStage {
+  id          String                    @id @default(uuid()) @db.Uuid
+  position    Int                       @unique
+  title       String
+  description String
+  assessments Assessment[]
+  progress    StudentSemesterProgress[]
+}
+
+model StudentSemesterProgress {
+  studentId   String         @db.Uuid
+  student     StudentProfile @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  stageId     String         @db.Uuid
+  stage       SemesterStage  @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  completedAt DateTime
+
+  @@id([studentId, stageId])
+}
+
+model XpEvent {
+  id        String         @id @default(uuid()) @db.Uuid
+  studentId String         @db.Uuid
+  student   StudentProfile @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  eventKey  String
+  kind      XpKind
+  amount    Int
+  createdAt DateTime       @default(now())
+
+  @@unique([studentId, eventKey])
+}
+
+model Achievement {
+  id          String               @id @default(uuid()) @db.Uuid
+  code        String               @unique
+  name        String
+  description String
+  rarity      String
+  icon        String
+  color       String
+  owners      StudentAchievement[]
+}
+
+model StudentAchievement {
+  studentId     String         @db.Uuid
+  student       StudentProfile @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  achievementId String         @db.Uuid
+  achievement   Achievement    @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  earnedAt      DateTime       @default(now())
+
+  @@id([studentId, achievementId])
+  @@index([studentId, earnedAt])
+}
+
+model DocumentRequest {
+  id              String                  @id @default(uuid()) @db.Uuid
+  number          Int                     @unique @default(autoincrement())
+  studentId       String                  @db.Uuid
+  student         User                    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  type            DocumentType
+  status          DocumentStatus          @default(DRAFT)
+  recipient       String
+  details         String
+  delivery        DocumentDelivery?
+  contactEmail    String?
+  contactPhone    String?
+  postalAddress   String?
+  reviewedAt      DateTime?
+  reviewedName    String?
+  reviewedYear    Int?
+  reviewedProgram String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  history         DocumentStatusHistory[]
+
+  @@index([studentId, createdAt])
+  @@index([status, updatedAt])
+}
+
+model DocumentStatusHistory {
+  id         String          @id @default(uuid()) @db.Uuid
+  documentId String          @db.Uuid
+  document   DocumentRequest @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  actorId    String          @db.Uuid
+  actor      User            @relation(fields: [actorId], references: [id])
+  status     DocumentStatus
+  comment    String?
+  createdAt  DateTime        @default(now())
+
+  @@index([documentId, createdAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  href      String?
+  eventKey  String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@unique([userId, eventKey])
+  @@index([userId, readAt, createdAt])
+}
+
+model Announcement {
+  id          String   @id @default(uuid()) @db.Uuid
+  groupId     String   @db.Uuid
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  publishedAt DateTime @default(now())
+
+  @@index([groupId, publishedAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String   @db.Uuid
+  actor     User     @relation(fields: [actorId], references: [id])
+  action    String
+  targetId  String   @db.Uuid
+  details   Json
+  createdAt DateTime @default(now())
+
+  @@index([targetId, createdAt])
+}
+
+model LoginAttempt {
+  key       String   @id
+  count     Int
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

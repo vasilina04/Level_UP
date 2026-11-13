@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: levelup
+      POSTGRES_USER: levelup
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U levelup -d levelup"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  app:
+    build: .
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      AUTH_TRUST_HOST: "true"
+      AUTH_LOCAL_HTTP: ${AUTH_LOCAL_HTTP:-0}
+      TRUST_PROXY_IP: ${TRUST_PROXY_IP:-0}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Vladivostok}
+      ENABLE_DEMO_SEED: ${ENABLE_DEMO_SEED:-0}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "pnpm db:deploy && exec pnpm start --hostname 0.0.0.0"]
+volumes:
+  postgres_data:

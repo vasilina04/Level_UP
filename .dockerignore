@@ -1,0 +1,14 @@
+node_modules
+.pnpm-store
+.next
+.next-dev
+.next-local
+.next-ux
+.git
+.env
+.env.local
+.env.*.local
+.local-pg
+test-results
+playwright-report
+*.tsbuildinfo
