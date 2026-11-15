@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, CalendarDays, ChartNoAxesColumn, ChevronRight, FileText, LayoutDashboard, LogOut, Map, MessageSquare, ShieldCheck, Swords, Trophy, UserRound, Zap } from "lucide-react";
+import { Bell, BookOpen, CalendarDays, ChartNoAxesColumn, ChevronRight, FileText, GraduationCap, LayoutDashboard, LogOut, Map, MessageSquare, ShieldCheck, Swords, Trophy, UserRound, Zap } from "lucide-react";
 import type { ReactNode } from "react";
 import { Brand, Avatar, initials } from "@/components/common";
 import { NavLink } from "@/components/nav-link";
@@ -9,10 +9,11 @@ import { logout } from "@/app/actions";
 const sections=[
   {label:"ОБЗОР",items:[{href:"/dashboard",label:"Главная",icon:LayoutDashboard},{href:"/semester-map",label:"Карта семестра",icon:Map},{href:"/quests",label:"Квесты",icon:Swords},{href:"/achievements",label:"Достижения",icon:Trophy}]},
   {label:"УЧЁБА",items:[{href:"/schedule",label:"Расписание",icon:CalendarDays},{href:"/grades",label:"Успеваемость",icon:ChartNoAxesColumn},{href:"/documents",label:"Заявки и справки",icon:FileText}]},
+  {label:"ПЛАНИРОВАНИЕ",items:[{href:"/courses",label:"Карты курсов",icon:BookOpen},{href:"/rating",label:"Мой рейтинг",icon:ChartNoAxesColumn},{href:"/calendar",label:"Календарь",icon:CalendarDays},{href:"/teachers",label:"Преподаватели",icon:GraduationCap}]},
   {label:"АККАУНТ",items:[{href:"/notifications",label:"Уведомления",icon:Bell},{href:"/profile",label:"Профиль",icon:UserRound}]},
 ];
 const staffItems=[{href:"/staff",label:"Заявки",icon:FileText},{href:"/staff/academic",label:"Учебные данные",icon:ChartNoAxesColumn}];
-const teacherItems=[{href:"/teacher",label:"Вопросы студентов",icon:MessageSquare}];
+const teacherItems=[{href:"/teacher",label:"Вопросы студентов",icon:MessageSquare},{href:"/teacher/courses",label:"Дисциплины",icon:BookOpen},{href:"/teacher/consultations",label:"Консультации",icon:CalendarDays}];
 export function Shell({children,name,subtitle,level,unread=0,staff=false,teacher=false,theme="dark",animations=true}:{children:ReactNode,name:string,subtitle:string,level?:number,unread?:number,staff?:boolean,teacher?:boolean,theme?:string,animations?:boolean}) {
   const groups=teacher?[{label:"ПРЕПОДАВАТЕЛЬ",items:teacherItems}]:staff?[{label:"ДЕКАНАТ",items:staffItems}]:sections;
   const profile=<><Avatar name={name}/><span><strong>{name}</strong><small>{subtitle}</small></span><ChevronRight size={16}/></>;

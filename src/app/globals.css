@@ -387,6 +387,23 @@ input:not([type=checkbox]):not([type=hidden]),textarea,select{border-color:var(-
 .checkpoint-messages li.teacher-message{border-inline-start:3px solid var(--mint)}
 .checkpoint-messages li small{display:block;margin-bottom:5px}
 .checkpoint-grid form{margin-top:14px}
+.planning-controls{border:0;padding:0;margin:0;min-inline-size:0}
+.planning-buttons{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.planning-list{list-style:disc;padding-inline-start:22px;overflow-wrap:anywhere}
+.plan-activity{min-inline-size:0}
+.plan-activity legend{padding-inline:8px;font-weight:700}
+.course-map{display:grid;gap:12px;padding-left:18px;list-style:none;border-inline-start:2px solid var(--control-line);margin-inline-start:10px}
+.course-node{display:grid;align-items:center;grid-template-columns:auto minmax(0,1fr) auto;gap:12px}
+.course-node:hover{border-color:var(--accent)}
+.course-node-marker{color:var(--accent)}
+.calendar-month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.calendar-month a{min-height:42px;display:grid;place-items:center;border:1px solid var(--line);border-radius:7px}
+.calendar-month a:hover{background:var(--surface)}
+.calendar-weekday{text-align:center;font-size:.8rem;color:var(--muted)}
+.rating-numbers{display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.rating-numbers div{display:grid}
+.rating-numbers strong{font-size:28px}
+@media(max-width:580px){.course-node{grid-template-columns:auto minmax(0,1fr)}.course-node>.pill{grid-column:2;justify-self:start}.planning-buttons>*{max-width:100%}}
 @media(max-width:580px){.request-contacts{grid-template-columns:minmax(0,1fr)}}
 @keyframes menu-in{from{opacity:0;translate:0 5px}}
 @media(max-width:1100px){.shell{grid-template-columns:196px minmax(0,1fr)}.card{padding:16px}}

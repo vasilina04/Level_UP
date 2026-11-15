@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { achievementDefinitions } from "../src/lib/rules";
 import { addDays, dayKey, weekOf } from "../src/lib/dates";
 import { completePersonal, synchronizeProgress } from "../src/lib/progress";
+import type { Activity, Plan } from "../src/lib/course-data";
 if (existsSync(".env")) process.loadEnvFile(".env");
 const db=new PrismaClient();
 export function key(label:string) {
@@ -58,6 +59,12 @@ async function seed() {
       const login=i===1?(p===0?"teacher1":"teacher2"):"teacher_"+p+"_"+i;
       const passwordHash=await hash(i===1?(p===0?"LevelUpTeacher1!":"LevelUpTeacher2!"):"LevelUpTeacherDemo!");
       await db.user.upsert({where:{id:instructorId},update:{passwordHash},create:{id:instructorId,login,name:teacher,passwordHash,role:"TEACHER"}});
+      const consultationRoom="А-"+(205+i+p*10);
+      await db.teacherProfile.createMany({data:{userId:instructorId,department:p===0?"Кафедра прикладной информатики":"Кафедра цифрового дизайна",
+        building:"Корпус А",room:consultationRoom,receptionHours:"По опубликованным слотам, 15:00–17:30",contactEmail:login+"@example.test"},skipDuplicates:true});
+      await db.consultationSlot.createMany({data:[2,4,7,9].map((day,index)=>({id:key("slot:"+instructorId+":"+calendar+":"+day),
+        teacherId:instructorId,startsAt:at(day,"15:00"),endsAt:at(day,"15:30"),format:index%2?"ONLINE" as const:"IN_PERSON" as const,
+        location:index%2?"https://example.test/consultation":"Корпус А, "+consultationRoom})),skipDuplicates:true});
       await db.subject.upsert({where:{id:subjectId},update:{instructorId},create:{id:subjectId,title,teacher,color,credits:i%2+3,instructorId}});
       await db.enrollment.upsert({where:{id:enrollmentId},update:{},create:{id:enrollmentId,studentId:id,subjectId,finalGrade:i===2?5:i===3?(p===0?4:5):null,creditPassed:i>=2}});
       for(const [g,label] of ["Практическая работа","Промежуточная работа","Контрольная работа"].entries()) {
@@ -86,6 +93,33 @@ async function seed() {
         await db.quest.upsert({where:{id:questId},update:{},create:{id:questId,studentId:id,enrollmentId,assessmentId,title,due,kind:i===18?"CREDIT":"LAB",
           description:"Подготовьте работу по требованиям преподавателя. Квест завершится после подтверждения контрольной точки в учебных данных."}});
       }
+    }
+    for(const [i,[title]] of student.subjects.entries()){
+      const subjectId=key(id+"subject"+i),enrollmentId=key(id+"enrollment"+i),authorId=key("teacher:"+student.login+":"+i);
+      if(await db.coursePlan.findUnique({where:{subjectId}})) continue;
+      const enrollment=await db.enrollment.findUniqueOrThrow({where:{id:enrollmentId},include:{assessments:{include:{stage:true}},exams:true}});
+      const room="Корпус А, А-"+(205+i+p*10);
+      const activities:Activity[]=enrollment.assessments.map(point=>({
+        id:key("activity:"+point.id),title:point.title,kind:(["PRACTICE","LAB","CONTROL","PROJECT","CREDIT","EXAM"] as const)[point.stage.position-1],
+        startsAt:(p===0&&point.title===student.titles[0]&&!point.passedAt?at(7):point.due).toISOString(),place:room,format:"Очно",
+        description:point.instructions??instructions[point.stage.position-1],topics:title+" · темы модуля «"+point.stage.title+"»",
+        requirements:"Подготовьте работу по заданию и обоснуйте решения на проверке.",max:20,weight:point.weight,optional:false,registration:false,materials:"",checkpointTitle:point.title,
+      }));
+      for(const exam of enrollment.exams) activities.push({id:key("activity:"+exam.id),title:exam.kind+" по дисциплине",kind:exam.kind==="Зачёт"?"CREDIT":"EXAM",
+        startsAt:exam.start.toISOString(),place:"Корпус А, "+exam.room,format:"Очно",description:"Итоговое мероприятие сессии.",topics:"Темы семестра",requirements:"Подготовьте ответы и разберите практические примеры.",max:30,weight:1,optional:false,registration:false,materials:"",examId:exam.id});
+      activities.push({id:key(subjectId+":extra"),title:"Дополнительный практикум",kind:"EXTRA",startsAt:at(10,"16:00").toISOString(),place:room,format:"Очно",
+        description:"Разбор дополнительных задач по теме курса.",topics:title,requirements:"Подготовьте один вопрос по изученным темам.",max:10,weight:1,optional:true,registration:true,materials:""});
+      const cap=activities.filter(item=>!item.optional).reduce((sum,item)=>sum+item.max*item.weight,0);
+      const plan:Plan={title,period:"Осенний семестр 2026/27",activities,rule:{cap,bonus:10,rounding:i%2?"NEAREST":"FLOOR",pass:Math.ceil(cap*.5),good:Math.ceil(cap*.7),excellent:Math.ceil(cap*.85)}};
+      await db.$transaction(async tx=>{
+        await tx.coursePlan.create({data:{subjectId,draft:plan,versions:{create:{number:1,data:plan,authorId,reason:"Первичная публикация демонстрационного плана"}}}});
+        const upcoming=enrollment.assessments.find(point=>p===0&&point.title===student.titles[0]&&!point.passedAt);
+        if(upcoming){
+          await tx.assessment.update({where:{id:upcoming.id},data:{due:at(7)}});
+          await tx.quest.updateMany({where:{assessmentId:upcoming.id,completion:null},data:{due:at(7)}});
+        }
+        await tx.courseResult.createMany({data:enrollment.assessments.filter(point=>point.passedAt).map((point,index)=>({enrollmentId,activityId:key("activity:"+point.id),points:12+index*2,status:"GRADED"}))});
+      });
     }
     for(let i=0;i<9;i++) {
       const questId=key(id+"personal"+i);

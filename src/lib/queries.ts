@@ -17,11 +17,12 @@ export const stagesFor = (studentId:string) => db.semesterStage.findMany({where:
   progress:{where:{studentId}},
 }});
 export const recentBadges=(studentId:string) => db.studentAchievement.findMany({where:{studentId},take:3,orderBy:[{earnedAt:"desc"},{achievementId:"asc"}],include:{achievement:true}});
-export async function refreshInbox(userId:string,groupId:string,reminders:boolean) {
+export async function refreshInbox(userId:string,groupId:string,reminders:boolean,coveredPoints:string[] = []) {
   const now=new Date();
   const [announcements,deadlines]=await Promise.all([
     db.announcement.findMany({where:{groupId,publishedAt:{lte:now}}}),
-    reminders ? db.quest.findMany({where:{studentId:userId,completion:null,due:{gte:now,lte:new Date(+now+3*86_400_000)}}}) : [],
+    reminders ? db.quest.findMany({where:{studentId:userId,completion:null,due:{gte:now,lte:new Date(+now+3*86_400_000)},
+      ...(coveredPoints.length?{OR:[{assessmentId:null},{assessmentId:{notIn:coveredPoints}}]}:{})}}) : [],
   ]);
   const rows = [
     ...announcements.map(a=>({userId,type:"ANNOUNCEMENT" as const,title:a.title,body:a.body,eventKey:"announcement:"+a.id,createdAt:a.publishedAt})),

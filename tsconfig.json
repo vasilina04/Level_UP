@@ -29,8 +29,11 @@
     "allowJs": true
   },
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "prisma/**/*.ts",
+    "*.config.ts",
     ".next-dev/types/**/*.ts",
     ".next-local/types/**/*.ts",
     ".next/types/**/*.ts",

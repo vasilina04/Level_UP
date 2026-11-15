@@ -19,6 +19,7 @@ export default async function Dashboard() {
       <div className="hero-content"><span className="hero-tag"><Sparkles size={15}/> {student.group.name} · {student.year} курс</span><h1>Привет, {name.split(" ")[0]}!</h1><p>Твои занятия, квесты и прогресс семестра.</p><Button asChild><Link href="/semester-map">Открыть карту семестра <ArrowRight size={17}/></Link></Button></div>
       <span className="hero-date">{calendarLabel(today,{day:"numeric",month:"long"})}</span>
     </section>
+    <nav className="tabs spaced" aria-label="Учебное планирование"><Link href="/teachers">Преподаватели</Link><Link href="/courses">Карты курсов</Link><Link href="/rating">Мой рейтинг</Link><Link href="/calendar">Календарь</Link></nav>
     <div className="dashboard-grid dashboard-overview">
       <section className="card semester"><CardHeader title="Прогресс семестра" icon={Map} href="/semester-map" link="Карта"/>
         <div className="semester-value">

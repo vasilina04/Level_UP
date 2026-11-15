@@ -5,13 +5,15 @@ import { db } from "@/lib/db";
 import { markNotification } from "@/app/actions";
 import { dateLabel, timeLabel } from "@/lib/dates";
 import { notificationTypes } from "@/lib/rules";
+import { refreshCourseReminders } from "@/lib/courses";
 import { Empty, IconTile, SectionTitle } from "@/components/common";
 import { Button } from "@/components/ui/button";
-const icons={SCHEDULE:CalendarDays,GRADE:ChartNoAxesColumn,DEADLINE:Clock,DOCUMENT:ClipboardList,ACHIEVEMENT:Trophy,ANNOUNCEMENT:Megaphone,TEACHER_REPLY:MessageSquare};
-const internalLink=/^(\/(quests|documents|grades|achievements|schedule|checkpoints)(\/[-\w]+)?|\/schedule\?day=\d{4}-\d{2}-\d{2})$/;
+const icons={SCHEDULE:CalendarDays,GRADE:ChartNoAxesColumn,DEADLINE:Clock,DOCUMENT:ClipboardList,ACHIEVEMENT:Trophy,ANNOUNCEMENT:Megaphone,TEACHER_REPLY:MessageSquare,CONSULTATION:CalendarDays,COURSE_PLAN:ClipboardList};
+const internalLink=/^(\/(quests|documents|grades|achievements|schedule|checkpoints|consultations)(\/[-\w]+)?|\/schedule\?day=\d{4}-\d{2}-\d{2}|\/rating\?course=[a-f0-9-]+|\/courses\/[a-f0-9-]+\/map\/(history|[a-f0-9-]+))$/;
 export default async function Notifications({searchParams}:{searchParams:Promise<{type?:string,read?:string}>}){
-  const {id}=await requireStudent(),params=await searchParams;
+  const {id,student}=await requireStudent(),params=await searchParams;
   const type=typeof params.type==="string"&&Object.hasOwn(notificationTypes,params.type)?params.type as keyof typeof notificationTypes:undefined;
+  if(student.reminders) await refreshCourseReminders(id);
   const unread=await db.notification.count({where:{userId:id,readAt:null}});
   const items=await db.notification.findMany({where:{userId:id,type,...(params.read==="unread"?{readAt:null}:params.read==="read"?{readAt:{not:null}}:{})},orderBy:{createdAt:"desc"}});
   return <><div className="page-heading"><SectionTitle title="Уведомления" subtitle={"Непрочитанных: "+unread}/>{unread>0&&<form action={markNotification}><input type="hidden" name="id" value="all"/><Button variant="secondary">Прочитать все</Button></form>}</div>

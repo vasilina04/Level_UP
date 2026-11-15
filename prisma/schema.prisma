@@ -43,6 +43,8 @@ enum NotificationType {
   ACHIEVEMENT
   ANNOUNCEMENT
   TEACHER_REPLY
+  CONSULTATION
+  COURSE_PLAN
 }
 
 enum QuestKind {
@@ -73,6 +75,9 @@ model User {
   audit              AuditLog[]
   taughtSubjects     Subject[]               @relation("Instructor")
   checkpointMessages CheckpointMessage[]
+  teacherProfile     TeacherProfile?
+  consultationSlots  ConsultationSlot[]
+  courseVersions     CoursePlanVersion[]
 }
 
 model Faculty {
@@ -91,23 +96,25 @@ model Group {
 }
 
 model StudentProfile {
-  userId       String                    @id @db.Uuid
-  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  groupId      String                    @db.Uuid
-  group        Group                     @relation(fields: [groupId], references: [id])
-  facultyId    String                    @db.Uuid
-  faculty      Faculty                   @relation(fields: [facultyId], references: [id])
-  year         Int
-  program      String
-  academicYear String
-  theme        String                    @default("dark")
-  animations   Boolean                   @default(true)
-  reminders    Boolean                   @default(true)
-  enrollments  Enrollment[]
-  quests       Quest[]
-  progress     StudentSemesterProgress[]
-  xp           XpEvent[]
-  achievements StudentAchievement[]
+  userId               String                    @id @db.Uuid
+  user                 User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupId              String                    @db.Uuid
+  group                Group                     @relation(fields: [groupId], references: [id])
+  facultyId            String                    @db.Uuid
+  faculty              Faculty                   @relation(fields: [facultyId], references: [id])
+  year                 Int
+  program              String
+  academicYear         String
+  theme                String                    @default("dark")
+  animations           Boolean                   @default(true)
+  reminders            Boolean                   @default(true)
+  enrollments          Enrollment[]
+  quests               Quest[]
+  progress             StudentSemesterProgress[]
+  xp                   XpEvent[]
+  achievements         StudentAchievement[]
+  consultationBookings ConsultationBooking[]
+  calendarEntries      CalendarEntry[]
 
   @@index([groupId])
   @@index([facultyId])
@@ -121,31 +128,34 @@ model StaffProfile {
 }
 
 model Subject {
-  id           String          @id @default(uuid()) @db.Uuid
-  title        String
-  teacher      String
-  credits      Int
-  color        String
-  enrollments  Enrollment[]
-  schedule     ScheduleEvent[]
-  instructorId String?         @db.Uuid
-  instructor   User?           @relation("Instructor", fields: [instructorId], references: [id], onDelete: SetNull)
+  id              String          @id @default(uuid()) @db.Uuid
+  title           String
+  teacher         String
+  credits         Int
+  color           String
+  enrollments     Enrollment[]
+  schedule        ScheduleEvent[]
+  instructorId    String?         @db.Uuid
+  instructor      User?           @relation("Instructor", fields: [instructorId], references: [id], onDelete: SetNull)
+  plan            CoursePlan?
+  calendarEntries CalendarEntry[]
 
   @@index([instructorId])
 }
 
 model Enrollment {
-  id           String         @id @default(uuid()) @db.Uuid
-  studentId    String         @db.Uuid
-  student      StudentProfile @relation(fields: [studentId], references: [userId], onDelete: Cascade)
-  subjectId    String         @db.Uuid
-  subject      Subject        @relation(fields: [subjectId], references: [id])
-  finalGrade   Int?
-  creditPassed Boolean        @default(false)
-  grades       Grade[]
-  assessments  Assessment[]
-  exams        Exam[]
-  quests       Quest[]
+  id            String         @id @default(uuid()) @db.Uuid
+  studentId     String         @db.Uuid
+  student       StudentProfile @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  subjectId     String         @db.Uuid
+  subject       Subject        @relation(fields: [subjectId], references: [id])
+  finalGrade    Int?
+  creditPassed  Boolean        @default(false)
+  grades        Grade[]
+  assessments   Assessment[]
+  exams         Exam[]
+  quests        Quest[]
+  courseResults CourseResult[]
 
   @@unique([studentId, subjectId])
 }
@@ -398,4 +408,107 @@ model LoginAttempt {
   expiresAt DateTime
 
   @@index([expiresAt])
+}
+
+enum ConsultationStatus {
+  PENDING
+  CONFIRMED
+  PROPOSED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum ConsultationFormat {
+  IN_PERSON
+  ONLINE
+}
+
+model TeacherProfile {
+  userId         String @id @db.Uuid
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department     String
+  building       String
+  room           String
+  receptionHours String
+  contactEmail   String
+}
+
+model ConsultationSlot {
+  id        String                @id @default(uuid()) @db.Uuid
+  teacherId String                @db.Uuid
+  teacher   User                  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  startsAt  DateTime
+  endsAt    DateTime
+  format    ConsultationFormat
+  location  String
+  closed    Boolean               @default(false)
+  bookings  ConsultationBooking[]
+
+  @@index([teacherId, startsAt])
+}
+
+model ConsultationBooking {
+  id        String             @id @default(uuid()) @db.Uuid
+  studentId String             @db.Uuid
+  student   StudentProfile     @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  slotId    String             @db.Uuid
+  slot      ConsultationSlot   @relation(fields: [slotId], references: [id])
+  status    ConsultationStatus @default(PENDING)
+  revision  Int                @default(0)
+  topic     String
+  comment   String
+  updatedAt DateTime           @updatedAt
+
+  @@index([studentId, updatedAt])
+  @@index([slotId, status])
+}
+
+model CoursePlan {
+  subjectId     String              @id @db.Uuid
+  subject       Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  draft         Json?
+  draftRevision Int                 @default(0)
+  versions      CoursePlanVersion[]
+}
+
+model CoursePlanVersion {
+  id          String     @id @default(uuid()) @db.Uuid
+  subjectId   String     @db.Uuid
+  plan        CoursePlan @relation(fields: [subjectId], references: [subjectId], onDelete: Restrict)
+  number      Int
+  data        Json
+  authorId    String     @db.Uuid
+  author      User       @relation(fields: [authorId], references: [id])
+  reason      String
+  publishedAt DateTime   @default(now())
+
+  @@unique([subjectId, number])
+}
+
+model CourseResult {
+  enrollmentId String     @db.Uuid
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  activityId   String     @db.Uuid
+  points       Int?
+  status       String
+  publishedAt  DateTime   @default(now())
+
+  @@id([enrollmentId, activityId])
+}
+
+model CalendarEntry {
+  id            String         @id @default(uuid()) @db.Uuid
+  studentId     String         @db.Uuid
+  student       StudentProfile @relation(fields: [studentId], references: [userId], onDelete: Cascade)
+  subjectId     String?        @db.Uuid
+  subject       Subject?       @relation(fields: [subjectId], references: [id])
+  activityId    String?        @db.Uuid
+  title         String?
+  startsAt      DateTime?
+  participation Boolean?
+  registrationStatus String?
+
+  @@unique([studentId, subjectId, activityId])
+  @@index([studentId, startsAt])
 }

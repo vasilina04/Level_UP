@@ -18,7 +18,7 @@ export type Status = keyof typeof documentStatuses;
 export const documentTransitions: Record<Status, Status[]> = {
   DRAFT: [], SUBMITTED: ["REVIEW"], REVIEW: ["APPROVED", "REJECTED"], APPROVED: ["READY"], REJECTED: [], READY: [],
 };
-export const notificationTypes = { SCHEDULE: "Расписание", GRADE: "Оценки", DEADLINE: "Дедлайны", DOCUMENT: "Заявки", ACHIEVEMENT: "Достижения", ANNOUNCEMENT: "Деканат", TEACHER_REPLY:"Ответы преподавателей" } as const;
+export const notificationTypes = { SCHEDULE: "Расписание", GRADE: "Оценки", DEADLINE: "Дедлайны", DOCUMENT: "Заявки", ACHIEVEMENT: "Достижения", ANNOUNCEMENT: "Деканат", TEACHER_REPLY:"Ответы преподавателей",CONSULTATION:"Консультации",COURSE_PLAN:"Планы курсов" } as const;
 export const achievementDefinitions = [
   {code:"first", name:"Первый шаг", description:"Выполнить первый квест", rarity:"Обычное", icon:"flag", color:"violet", goal:1},
   {code:"labs", name:"Мастер лабораторных", description:"Подтвердить пять лабораторных работ", rarity:"Редкое", icon:"flask", color:"blue", goal:5},
