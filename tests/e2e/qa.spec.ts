@@ -348,6 +348,12 @@ test("staff can change room, reschedule and cancel with a trace visible to the s
     await save(true);
     await expect.poll(async()=> (await db.scheduleEvent.findUniqueOrThrow({where:{id:target.id}})).room).toBe("QA-101");
     expect((await db.scheduleEvent.findUniqueOrThrow({where:{id:target.id}})).format).toBe("Очно");
+    await login(student,"student1");
+    const changedLesson=student.locator("article.lesson").filter({hasText:"QA занятие"});
+    await student.goto("/schedule?day="+dayKey(target.start));
+    await expect(changedLesson).toHaveClass(/lesson-changed gold/);
+    await expect(changedLesson.getByText("Смена аудитории",{exact:true})).toBeVisible();
+    await expect(changedLesson.locator(".lesson-change-summary")).toContainText("Аудитория: Онлайн → QA-101");
     await openEdit();
     await form.getByLabel("Изменение").selectOption("time");
     const day=addDays(dayKey(new Date()),2);
@@ -360,11 +366,12 @@ test("staff can change room, reschedule and cancel with a trace visible to the s
     await save(true);
     await expect.poll(async()=>dayKey((await db.scheduleEvent.findUniqueOrThrow({where:{id:target.id}})).start)).toBe(day);
     expect(timeLabel((await db.scheduleEvent.findUniqueOrThrow({where:{id:target.id}})).start)).toBe("11:00");
+    await student.goto("/schedule?day="+day+"&view=week");
+    await expect(changedLesson.getByText("Перенесено",{exact:true})).toBeVisible();
     await openEdit();
     await form.getByLabel("Изменение").selectOption("cancel");
     await save(true);
     await expect.poll(async()=> (await db.scheduleEvent.findUniqueOrThrow({where:{id:target.id}})).cancelled).toBe(true);
-    await login(student,"student1");
     await student.goto("/schedule?day="+day);
     const lesson=student.locator("article").filter({hasText:"QA занятие"});
     await expect(lesson.getByText("Отменено",{exact:true})).toBeVisible();
@@ -378,4 +385,74 @@ test("staff can change room, reschedule and cancel with a trace visible to the s
     await db.auditLog.deleteMany({where:{targetId:target.id}});
     await db.scheduleEvent.delete({where:{id:target.id}});
   }
+});
+
+test("a newly published lesson is highlighted for its group and stays in the schedule", async ({page,browser}) => {
+  const groupId=key("ИТ-201");
+  const studentId=key("student1");
+  const subject=await db.subject.findFirstOrThrow({where:{title:"Базы данных",enrollments:{some:{studentId}}}});
+  const day=addDays(dayKey(new Date()),2),reason="Дополнительная практика "+randomUUID().slice(0,8);
+  const student=await browser.newPage(),other=await browser.newPage();
+  let lessonId:string|undefined;
+  try {
+    await login(page,"staff");
+    await page.goto("/staff/academic");
+    await page.getByText("Добавить занятие",{exact:true}).click();
+    const form=page.locator("form").filter({has:page.getByRole("button",{name:"Добавить пару"})});
+    lessonId=await form.locator('input[name="id"]').inputValue();
+    await form.getByLabel("Группа и дисциплина").selectOption(`${groupId}:${subject.id}`);
+    await form.getByLabel("Вид занятия").selectOption("Практика");
+    await form.getByLabel("Начало занятия").fill(`${day}T17:30`);
+    await form.getByLabel("Окончание занятия").fill(`${day}T18:30`);
+    await form.getByLabel("Корпус").fill("Корпус Б");
+    await form.getByLabel("Аудитория").fill("Б-432");
+    await form.getByLabel("Причина добавления").fill(reason);
+    await form.getByRole("button",{name:"Добавить пару"}).click();
+    await expect.poll(()=>db.scheduleEvent.count({where:{id:lessonId,groupId}})).toBe(1);
+    await login(student,"student1");
+    await student.setViewportSize({width:360,height:800});
+    for(const view of ["day","week"]){
+      await student.goto(`/schedule?day=${day}&view=${view}`);
+      const card=student.locator("article.lesson").filter({hasText:"Б-432"});
+      await expect(card).toHaveClass(/lesson-changed mint/);
+      await expect(card.getByText("Новая пара",{exact:true})).toBeVisible();
+      expect(await student.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+    }
+    await student.goto("/notifications?type=SCHEDULE");
+    const notice=student.locator("article").filter({hasText:reason});
+    await expect(notice.getByText("Новая пара",{exact:true})).toBeVisible();
+    await notice.getByRole("link",{name:"Открыть"}).click();
+    await expect(student.locator("article.lesson").filter({hasText:"Б-432"})).toBeVisible();
+    await login(other,"student2");
+    await other.goto(`/schedule?day=${day}`);
+    await expect(other.getByText("Б-432",{exact:false})).toHaveCount(0);
+  } finally {
+    await student.close();
+    await other.close();
+    if(lessonId){
+      await db.notification.deleteMany({where:{body:{contains:reason}}});
+      await db.auditLog.deleteMany({where:{targetId:lessonId}});
+      await db.scheduleEvent.deleteMany({where:{id:lessonId}});
+    }
+  }
+});
+
+test("teacher cards are equal on desktop and stack on mobile", async ({page}) => {
+  await login(page,"student1");
+  const cards=page.locator(".teacher-grid article");
+  await page.setViewportSize({width:1600,height:1000});
+  await page.goto("/teachers");
+  await expect(cards).toHaveCount(4);
+  const boxes=await cards.evaluateAll(items=>items.map(item=>{const {x,y,width,height}=item.getBoundingClientRect();return {x,y,width,height};}));
+  expect(Math.abs(boxes[0].y-boxes[1].y)).toBeLessThan(1);
+  expect(boxes[1].x).toBeGreaterThan(boxes[0].x);
+  for(const box of boxes){
+    expect(Math.abs(box.width-boxes[0].width)).toBeLessThan(1);
+    expect(Math.abs(box.height-boxes[0].height)).toBeLessThan(1);
+  }
+  await page.setViewportSize({width:360,height:800});
+  const first=(await cards.nth(0).boundingBox())!,second=(await cards.nth(1).boundingBox())!;
+  expect(second.x).toBeCloseTo(first.x);
+  expect(second.y).toBeGreaterThan(first.y+first.height);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 });

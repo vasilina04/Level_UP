@@ -13,7 +13,7 @@ const sections=[
   {label:"АККАУНТ",items:[{href:"/notifications",label:"Уведомления",icon:Bell},{href:"/profile",label:"Профиль",icon:UserRound}]},
 ];
 const staffItems=[{href:"/staff",label:"Заявки",icon:FileText},{href:"/staff/academic",label:"Учебные данные",icon:ChartNoAxesColumn}];
-const teacherItems=[{href:"/teacher",label:"Вопросы студентов",icon:MessageSquare},{href:"/teacher/courses",label:"Дисциплины",icon:BookOpen},{href:"/teacher/consultations",label:"Консультации",icon:CalendarDays}];
+const teacherItems=[{href:"/teacher",label:"Вопросы студентов",icon:MessageSquare},{href:"/teacher/schedule",label:"Расписание",icon:CalendarDays},{href:"/teacher/courses",label:"Дисциплины",icon:BookOpen},{href:"/teacher/consultations",label:"Консультации",icon:CalendarDays}];
 export function Shell({children,name,subtitle,level,unread=0,staff=false,teacher=false,theme="dark",animations=true}:{children:ReactNode,name:string,subtitle:string,level?:number,unread?:number,staff?:boolean,teacher?:boolean,theme?:string,animations?:boolean}) {
   const groups=teacher?[{label:"ПРЕПОДАВАТЕЛЬ",items:teacherItems}]:staff?[{label:"ДЕКАНАТ",items:staffItems}]:sections;
   const profile=<><Avatar name={name}/><span><strong>{name}</strong><small>{subtitle}</small></span><ChevronRight size={16}/></>;

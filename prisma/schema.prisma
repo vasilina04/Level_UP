@@ -74,6 +74,7 @@ model User {
   history            DocumentStatusHistory[]
   audit              AuditLog[]
   taughtSubjects     Subject[]               @relation("Instructor")
+  substituteLessons  ScheduleEvent[]        @relation("ScheduleSubstitute")
   checkpointMessages CheckpointMessage[]
   teacherProfile     TeacherProfile?
   consultationSlots  ConsultationSlot[]
@@ -172,6 +173,8 @@ model ScheduleEvent {
   room            String
   building        String?
   teacherOverride String?
+  teacherOverrideId String?          @db.Uuid
+  teacherOverrideUser User?          @relation("ScheduleSubstitute", fields: [teacherOverrideId], references: [id], onDelete: SetNull)
   cancelled       Boolean          @default(false)
   revision        Int              @default(0)
   format          String
@@ -179,6 +182,7 @@ model ScheduleEvent {
   changes         ScheduleChange[]
 
   @@index([groupId, start])
+  @@index([teacherOverrideId, start])
 }
 
 model ScheduleChange {

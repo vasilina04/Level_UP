@@ -201,15 +201,17 @@ test("schedule edits preserve revisions and notify the student",async({page,brow
     await notification.getByRole("link",{name:"Открыть"}).click();
     const lesson=page.locator("article").filter({hasText:"Е. И. Тестова"});
     await expect(lesson).toBeVisible();
+    await expect(lesson.getByText("Замена преподавателя",{exact:true})).toBeVisible();
+    await expect(lesson.locator(".lesson-change-summary")).toContainText(/Преподаватель: .* → Е. И. Тестова/);
     await lesson.getByText("История изменений").click();
-    await expect(lesson.getByText(/Преподаватель: .* → Е. И. Тестова/)).toBeVisible();
+    await expect(lesson.locator(".schedule-history").getByText(/Преподаватель: .* → Е. И. Тестова/)).toBeVisible();
   } finally {
     await staff.close();
     const edits=await db.scheduleChange.findMany({where:{eventId:original.id,reason:"Проверка замены преподавателя"}});
     await db.$transaction([
       db.notification.deleteMany({where:{eventKey:{in:edits.map(edit=>"schedule:"+edit.id)}}}),
       db.scheduleChange.deleteMany({where:{id:{in:edits.map(edit=>edit.id)}}}),
-      db.scheduleEvent.update({where:{id:original.id},data:{teacherOverride:original.teacherOverride,note:original.note,revision:original.revision}}),
+      db.scheduleEvent.update({where:{id:original.id},data:{teacherOverride:original.teacherOverride,teacherOverrideId:original.teacherOverrideId,note:original.note,revision:original.revision}}),
     ]);
   }
 });

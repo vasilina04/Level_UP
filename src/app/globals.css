@@ -190,6 +190,9 @@ textarea{resize:vertical}
 .schedule-day{margin-top:13px}
 .schedule-day h2{display:flex;align-items:center;gap:8px;text-transform:capitalize;margin-bottom:6px}
 .lesson{align-items:flex-start}
+.lesson-changed{margin-block:4px;padding:10px;border-radius:10px;background:var(--tone-bg);border:1px solid var(--tone-line);border-inline-start:3px solid var(--tone)}
+.rows>.lesson-changed:last-child{border-bottom:1px solid var(--tone-line)}
+.lesson-change-summary{color:var(--text)}
 .schedule-history{color:var(--muted);font-size:11px}
 .schedule-history summary{padding:4px 0;color:var(--accent)}
 .subject{border-bottom:1px solid var(--line);padding:5px 0}
@@ -389,6 +392,11 @@ input:not([type=checkbox]):not([type=hidden]),textarea,select{border-color:var(-
 .checkpoint-grid form{margin-top:14px}
 .planning-controls{border:0;padding:0;margin:0;min-inline-size:0}
 .planning-buttons{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.teacher-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;gap:18px}
+.teacher-card{display:flex;flex-direction:column;gap:14px;overflow-wrap:anywhere}
+.teacher-card>p{margin:0}
+.teacher-card .planning-buttons{margin-top:auto}
+@media(max-width:580px){.teacher-grid{grid-template-columns:minmax(0,1fr);grid-auto-rows:auto;gap:12px}.lesson{display:grid;grid-template-columns:auto minmax(0,1fr)}.lesson>.pill{grid-column:2;justify-self:start}.lesson .time-tile{grid-row:span 2}}
 .planning-list{list-style:disc;padding-inline-start:22px;overflow-wrap:anywhere}
 .plan-activity{min-inline-size:0}
 .plan-activity legend{padding-inline:8px;font-weight:700}

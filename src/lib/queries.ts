@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { dayKey, addDays } from "@/lib/dates";
 import { levelFor } from "@/lib/rules";
@@ -40,8 +41,11 @@ export function gradesSummary(enrollments: Awaited<ReturnType<typeof gradesFor>>
 export function scheduleRange(first:string,last:string) {
   return {gte:new Date(first+"T00:00:00Z").valueOf()-36*3_600_000,lt:new Date(addDays(last,1)+"T00:00:00Z").valueOf()+36*3_600_000};
 }
-export async function scheduleFor(groupId:string,first:string,last:string) {
+async function scheduleInRange(where:Prisma.ScheduleEventWhereInput,first:string,last:string) {
   const bounds=scheduleRange(first,last);
-  const rows=await db.scheduleEvent.findMany({where:{groupId,start:{gte:new Date(bounds.gte),lt:new Date(bounds.lt)}},orderBy:{start:"asc"},include:{subject:true,changes:{orderBy:{createdAt:"desc"}}}});
+  const rows=await db.scheduleEvent.findMany({where:{...where,start:{gte:new Date(bounds.gte),lt:new Date(bounds.lt)}},orderBy:{start:"asc"},
+    include:{subject:true,group:{select:{name:true}},changes:{orderBy:{createdAt:"desc"}}}});
   return rows.filter(row=>{const day=dayKey(row.start);return day>=first&&day<=last;});
 }
+export const scheduleFor=(groupId:string,first:string,last:string)=>scheduleInRange({groupId},first,last);
+export const scheduleForTeacher=(teacherId:string,first:string,last:string)=>scheduleInRange({OR:[{subject:{instructorId:teacherId}},{teacherOverrideId:teacherId}]},first,last);

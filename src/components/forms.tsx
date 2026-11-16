@@ -5,7 +5,7 @@ import { ArrowRight, Check, Eye, EyeOff, LoaderCircle, LockKeyhole, UserRound } 
 import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { signIn } from "next-auth/react";
-import { reviseSchedule, type Result } from "@/app/actions";
+import { createLesson, reviseSchedule, type Result } from "@/app/actions";
 type Action = (previous:Result, data:FormData)=>Promise<Result>;
 export function Submit({children}:{children:ReactNode}) {
   const {pending}=useFormStatus();
@@ -61,14 +61,38 @@ export function LoginForm({initialError}:{initialError?:string}) {
     {error&&<p className="form-feedback error" role="alert">{error}</p>}
   </form>;
 }
-export function ScheduleEditForm({id,revision,room,building,teacher}:{id:string,revision:number,room:string,building:string,teacher:string}){
+export function ScheduleEditForm({id,revision,room,building,teacher,substituteId,teachers}:{id:string,revision:number,room:string,building:string,teacher:string,substituteId:string|null,teachers:{id:string,name:string}[]}){
   const [kind,setKind]=useState("room");
+  const [replacement,setReplacement]=useState(substituteId??"");
   return <ActionForm action={reviseSchedule} className="stack subject-detail">
     <input type="hidden" name="id" value={id}/><input type="hidden" name="revision" value={revision}/><input type="hidden" name="kind" value={kind}/>
     <label>Изменение<select value={kind} onChange={event=>setKind(event.target.value)}><option value="room">Другая аудитория</option><option value="teacher">Замена преподавателя</option><option value="time">Перенос занятия</option><option value="cancel">Отмена занятия</option></select></label>
     {kind==="room"&&<><label>Корпус<input name="building" defaultValue={building} maxLength={80} required/></label><label>Аудитория<input name="room" defaultValue={room} maxLength={80} required/></label></>}
-    {kind==="teacher"&&<label>Преподаватель<input name="teacherOverride" defaultValue={teacher} maxLength={100} required/></label>}
+    {kind==="teacher"&&<>
+      <label>Аккаунт для замены<select name="teacherOverrideId" value={replacement} onChange={event=>setReplacement(event.target.value)}>
+        <option value="">Ввести имя вручную</option><option value="original">Вернуть назначенного преподавателя</option>
+        {teachers.map(person=><option key={person.id} value={person.id}>{person.name}</option>)}
+      </select></label>
+      {!replacement&&<label>Преподаватель<input name="teacherOverride" defaultValue={teacher} maxLength={100} required/></label>}
+    </>}
     {kind==="time"&&<><label>Новое начало<input name="start" type="datetime-local" required/></label><label>Новое окончание<input name="end" type="datetime-local" required/></label></>}
     <label>Причина изменения<input name="reason" maxLength={200} minLength={3} required/></label><Submit>Сохранить изменение</Submit>
+  </ActionForm>;
+}
+
+export function ScheduleAddForm({id,groups}:{id:string,groups:{id:string,name:string,subjects:{id:string,title:string}[]}[]}){
+  const [format,setFormat]=useState("Очно");
+  return <ActionForm action={createLesson} className="stack subject-detail">
+    <input type="hidden" name="id" value={id}/>
+    <label>Группа и дисциплина<select name="offering" defaultValue="" required><option value="" disabled>Выберите дисциплину группы</option>
+      {groups.map(group=><optgroup key={group.id} label={group.name}>{group.subjects.map(subject=><option key={subject.id} value={`${group.id}:${subject.id}`}>{subject.title}</option>)}</optgroup>)}
+    </select></label>
+    <label>Вид занятия<select name="kind"><option>Лекция</option><option>Практика</option><option>Лабораторная</option><option>Семинар</option></select></label>
+    <label>Формат<select name="format" value={format} onChange={event=>setFormat(event.target.value)}><option>Очно</option><option>Онлайн</option></select></label>
+    <label>Начало занятия<input name="start" type="datetime-local" required/></label>
+    <label>Окончание занятия<input name="end" type="datetime-local" required/></label>
+    {format==="Очно"&&<><label>Корпус<input name="building" maxLength={80} required/></label><label>Аудитория<input name="room" maxLength={80} required/></label></>}
+    <label>Причина добавления<input name="reason" maxLength={200} minLength={3} required/></label>
+    <Submit>Добавить пару</Submit>
   </ActionForm>;
 }

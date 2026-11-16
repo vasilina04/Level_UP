@@ -1,17 +1,24 @@
 import { requireStaff } from "@/lib/access";
 import { db } from "@/lib/db";
 import { verifyAssessment } from "@/app/actions";
-import { ActionForm, ScheduleEditForm, Submit } from "@/components/forms";
+import { ActionForm, ScheduleAddForm, ScheduleEditForm, Submit } from "@/components/forms";
 import { Empty, SectionTitle } from "@/components/common";
 import { dateLabel, timeLabel } from "@/lib/dates";
 export default async function AcademicStaff(){
   const {staff}=await requireStaff(),facultyId=staff.facultyId;
-  const [assessments,events]=await Promise.all([
+  const [assessments,events,groups,teachers]=await Promise.all([
     db.assessment.findMany({where:{passedAt:null,...(facultyId?{enrollment:{student:{facultyId}}}:{})},include:{enrollment:{include:{subject:true,student:{include:{user:{select:{name:true}}}}}}},orderBy:{due:"asc"},take:50}),
     db.scheduleEvent.findMany({where:{end:{gte:new Date()},cancelled:false,...(facultyId?{group:{students:{some:{facultyId},every:{facultyId}}}}:{})},include:{group:true,subject:true},orderBy:{start:"asc"},take:20}),
+    db.group.findMany({where:{students:facultyId?{some:{facultyId},every:{facultyId}}:{some:{}}},orderBy:{name:"asc"},
+      select:{id:true,name:true,students:{select:{enrollments:{select:{subject:{select:{id:true,title:true}}}}}}}}),
+    db.user.findMany({where:{role:"TEACHER"},select:{id:true,name:true},orderBy:[{name:"asc"},{id:"asc"}]}),
   ]);
+  const offerings=groups.map(({id,name,students})=>({id,name,subjects:[...new Map(students.flatMap(student=>student.enrollments.map(({subject})=>[subject.id,subject] as const))).values()]
+    .sort((a,b)=>a.title.localeCompare(b.title,"ru"))})).filter(group=>group.subjects.length>0);
   return <><SectionTitle title="Учебные данные" subtitle="Подтверждение контрольных точек и изменения расписания."/><div className="dashboard-grid">
     <section className="card"><h2>Контрольные точки</h2>{assessments.length?assessments.map(a=><details className="subject" key={a.id}><summary><span><strong>{a.title}</strong><small>{a.enrollment.student.user.name} · {a.enrollment.subject.title}</small></span></summary><ActionForm action={verifyAssessment} className="stack subject-detail"><input type="hidden" name="id" value={a.id}/><p className="muted">Дедлайн · {dateLabel(a.due)}</p><Submit>Подтвердить выполнение</Submit></ActionForm></details>):<Empty title="Все контрольные точки закрыты"/>}</section>
-    <section className="card"><h2>Ближайшие занятия</h2>{events.length?events.map(e=><details className="subject" key={e.id}><summary><span><strong>{e.subject.title}</strong><small>{e.group.name} · {dateLabel(e.start)} · {timeLabel(e.start)} · {e.room}</small></span></summary><ScheduleEditForm id={e.id} revision={e.revision} room={e.room} building={e.building||"Главный корпус"} teacher={e.teacherOverride||e.subject.teacher}/></details>):<Empty title="Ближайших занятий нет"/>}</section>
+    <section className="card"><h2>Ближайшие занятия</h2>
+      {offerings.length>0&&<details className="subject"><summary>Добавить занятие</summary><ScheduleAddForm id={crypto.randomUUID()} groups={offerings}/></details>}
+      {events.length?events.map(e=><details className="subject" key={e.id}><summary><span><strong>{e.subject.title}</strong><small>{e.group.name} · {dateLabel(e.start)} · {timeLabel(e.start)} · {e.room}</small></span></summary><ScheduleEditForm id={e.id} revision={e.revision} room={e.room} building={e.building||"Главный корпус"} teacher={e.teacherOverride||e.subject.teacher} substituteId={e.teacherOverrideId} teachers={teachers}/></details>):<Empty title="Ближайших занятий нет"/>}</section>
   </div></>;
 }

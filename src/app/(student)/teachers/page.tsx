@@ -16,9 +16,9 @@ export default async function Teachers({searchParams}:{searchParams:Promise<{q?:
     <div className="page-heading"><form className="filter-bar"><label>Поиск<input name="q" defaultValue={q} placeholder="ФИО, дисциплина или кафедра"/></label>
       <label>Кафедра<select name="department" defaultValue={department}><option value="">Все кафедры</option>{departments.map(item=><option key={item}>{item}</option>)}</select></label><Button>Найти</Button></form>
       <Link className="text-link" href="/consultations">Мои консультации →</Link></div>
-    {rows.length?<div className="dashboard-grid">{rows.map(t=>{
+    {rows.length?<div className="teacher-grid">{rows.map(t=>{
       const p=t.teacherProfile!;
-      return <article className="card stack" key={t.id}><h2>{t.name}</h2><p>{p.department}</p><p>{t.taughtSubjects.map(s=>s.title).join(", ")}</p>
+      return <article className="card teacher-card" key={t.id}><h2>{t.name}</h2><p>{p.department}</p><p>{t.taughtSubjects.map(s=>s.title).join(", ")}</p>
         <p className="muted">{p.building}, {p.room} · {p.receptionHours}</p><a className="text-link" href={"mailto:"+p.contactEmail}>{p.contactEmail}</a>
         <div className="planning-buttons"><Button asChild variant="secondary"><Link href={"/teachers/"+t.id}>Подробнее</Link></Button><Button asChild><Link href={"/teachers/"+t.id+"#booking"}>Записаться</Link></Button></div>
       </article>;
