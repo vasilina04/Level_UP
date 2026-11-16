@@ -17,7 +17,7 @@ export default async function EditCourse({params}:{params:Promise<{id:string}>})
   const dates=Object.fromEntries(plan.activities.map(item=>{const date=new Date(item.startsAt);return [item.id,dayKey(date)+"T"+timeLabel(date)];}));
   const checkpoints=[...new Set(course.enrollments.flatMap(e=>e.assessments.map(a=>a.title)))];
   return <><Back href="/teacher/courses" label="К дисциплинам"/><SectionTitle title={course.title} subtitle={latest?`Опубликована версия ${latest.number}.0`:"План ещё не опубликован"}/>
-    <Link className="text-link" href={`/teacher/courses/${id}/results`}>Результаты студентов →</Link>
+    <Link className="text-link" href={`/teacher/courses/${id}/results`}>Ведомость оценок →</Link>
     <CoursePlanEditor key={revision} subjectId={id} revision={revision} plan={plan} localDates={dates} defaultDate={addDays(dayKey(new Date()),7)+"T12:00"} checkpoints={checkpoints}/>
   </>;
 }

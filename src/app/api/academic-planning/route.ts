@@ -3,11 +3,13 @@ import { getUser } from "@/lib/access";
 import { db } from "@/lib/db";
 import { fromLocal } from "@/lib/dates";
 import { planSchema } from "@/lib/course-data";
-import { saveCoursePlan,publishCourseResult,publishFinalGrade } from "@/lib/courses";
+import { saveCoursePlan } from "@/lib/courses";
+import { publishGradebook } from "@/lib/gradebook";
 import { createSlot,reserveSlot,updateBooking,setSlotClosed } from "@/lib/consultations";
 import { setCourseEntry,decideParticipation } from "@/lib/calendar";
 const uuid=z.string().uuid(),revision=z.coerce.number().int().min(0);
 const optionalId=z.union([uuid,z.literal("")]).optional();
+const resultStatus=z.enum(["GRADED","WAITING","MISSED"]),confirmation=z.literal("on").optional();
 const editorPlan=z.preprocess(value=>{
   if(!value||typeof value!=="object"||!("activities" in value)||!Array.isArray(value.activities)) return value;
   return {...value,activities:value.activities.map((item:unknown)=>{
@@ -21,14 +23,23 @@ const schema=z.discriminatedUnion("operation",[
   z.object({operation:z.literal("slot"),start:z.string(),end:z.string(),format:z.enum(["IN_PERSON","ONLINE"]),location:z.string().trim().min(2).max(300)}),
   z.object({operation:z.literal("closeSlot"),id:uuid}),
   z.object({operation:z.literal("savePlan"),subjectId:uuid,revision,plan:editorPlan,intent:z.enum(["draft","publish"]),reason:z.string().trim().max(300)}),
-  z.object({operation:z.literal("result"),subjectId:uuid,enrollmentId:uuid,activityId:uuid,status:z.enum(["GRADED","WAITING","MISSED"]),points:z.union([z.literal(""),z.number().int(),z.string().regex(/^\d{1,4}$/).transform(Number).pipe(z.number().max(1000))]).optional(),confirmCheckpoint:z.literal("on").optional()}),
+  z.object({operation:z.literal("result"),subjectId:uuid,enrollmentId:uuid,activityId:uuid,status:resultStatus,points:z.union([z.literal(""),z.number().int(),z.string().regex(/^\d{1,4}$/).transform(Number).pipe(z.number().max(1000))]).optional(),confirmCheckpoint:confirmation}),
   z.object({operation:z.literal("finalGrade"),enrollmentId:uuid,grade:z.enum(["2","3","4","5"])}),
+  z.object({operation:z.literal("gradebookFinal"),subjectId:uuid,rows:z.array(z.object({enrollmentId:uuid,grade:z.number().int().min(2).max(5),expected:z.number().int().nullable()})).min(1)}),
+  z.object({operation:z.literal("gradebookActivity"),subjectId:uuid,activityId:uuid,rows:z.array(z.object({enrollmentId:uuid,status:resultStatus,
+    points:z.number().int().min(0).max(1000).nullable(),confirmCheckpoint:confirmation,expectedAt:z.string().datetime().nullable()})).min(1)}),
   z.object({operation:z.literal("calendarActivity"),subjectId:uuid,activityId:uuid,choice:z.enum(["add","remove","join","skip"])}),
   z.object({operation:z.literal("reminder"),id:uuid,title:z.string().trim().min(2).max(120),start:z.string()}),
   z.object({operation:z.literal("removeReminder"),id:uuid}),
   z.object({operation:z.literal("participation"),id:uuid,status:z.enum(["CONFIRMED","REJECTED"])}),
 ]);
 const reply=(message:string,status=200,href?:string)=>Response.json({message,href},{status});
+function gradebookReply(result:Awaited<ReturnType<typeof publishGradebook>>,message:string) {
+  if(result==="ok") return reply(message);
+  if(result==="conflict") return reply("Оценки уже изменились. Обновите страницу и проверьте ведомость.",409);
+  if(result==="unavailable") return reply("Одна или несколько записей недоступны для этой дисциплины.",404);
+  return reply("Проверьте баллы и статусы в ведомости.",400);
+}
 export async function POST(request:Request) {
   const scheme=process.env.NODE_ENV==="production"&&process.env.AUTH_LOCAL_HTTP!=="1"?"https":"http";
   const origin=process.env.AUTH_URL?new URL(process.env.AUTH_URL).origin:scheme+"://"+request.headers.get("host");
@@ -71,10 +82,17 @@ export async function POST(request:Request) {
           ?reply(data.intent==="publish"?"Версия плана опубликована.":"Черновик сохранён."):reply("Курс недоступен или черновик уже изменился.",409);
       case "result":
         if(!teacher) break;
-        return await publishCourseResult({...data,teacherId:user.id,points:typeof data.points==="number"?data.points:null})?reply("Результат опубликован."):reply("Проверьте балл, мероприятие и дисциплину.",400);
+        return await publishGradebook(user.id,{kind:"activity",subjectId:data.subjectId,activityId:data.activityId,
+          rows:[{...data,points:typeof data.points==="number"?data.points:null}]})==="ok"?reply("Результат опубликован."):reply("Проверьте балл, мероприятие и дисциплину.",400);
       case "finalGrade":
         if(!teacher) break;
-        return await publishFinalGrade(user.id,data.enrollmentId,Number(data.grade))?reply("Итоговая оценка сохранена."):reply("Запись недоступна.",404);
+        return gradebookReply(await publishGradebook(user.id,{kind:"final",rows:[{enrollmentId:data.enrollmentId,grade:Number(data.grade)}]}),"Итоговая оценка сохранена.");
+      case "gradebookFinal":
+        if(!teacher) break;
+        return gradebookReply(await publishGradebook(user.id,{kind:"final",...data}),"Итоговые оценки сохранены.");
+      case "gradebookActivity":
+        if(!teacher) break;
+        return gradebookReply(await publishGradebook(user.id,{kind:"activity",...data}),"Результаты сохранены.");
       case "calendarActivity":
         if(!student) break;
         return await setCourseEntry(user.id,data.subjectId,data.activityId,data.choice)?reply("Календарь обновлён."):reply("Мероприятие недоступно.",404);

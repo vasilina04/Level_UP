@@ -23,6 +23,8 @@ export default async function Rating({searchParams}:{searchParams:Promise<{cours
       {rule?<p>Баллы за работу умножаются на её вес. Дополнительные мероприятия дают до {rule.bonus} баллов. Пороги оценок 3 / 4 / 5: {rule.pass} / {rule.good} / {rule.excellent}. Округление: {roundingLabels[rule.rounding]}.</p>:<p>Правила курса ещё не опубликованы. Доступны только баллы мероприятий.</p>}
     </section>{rule&&<RatingCalculator rule={rule} earned={rating.earned} bonusEarned={rating.bonusEarned} maximum={rating.maximum!} activities={rating.remaining.map(({id,title,max,weight,optional})=>({id,title,max,weight,optional}))}/>}</div>
     <section className="card spaced"><h2>Рейтинговые мероприятия</h2><div className="rows">{rating.rows.map(row=><Link className="data-row" key={row.id} href={`/courses/${course.subjectId}/map/${row.id}`}><div className="row-content"><strong>{row.title}</strong><small>{activityKinds[row.kind]} · вес {row.weight}</small></div><span>{row.result?.status==="MISSED"?"Пропущено":row.result?.points??"—"} / {row.max}</span></Link>)}</div></section>
-    </>:<Empty title="Рейтинг появится после публикации плана"/>}
+    </>:course?.finalGrade!=null?<section className="card stack"><h2>{course.subject.title}</h2>
+      <p>Итоговая оценка: {course.finalGrade}</p><p className="muted">Рейтинг появится после публикации плана.</p>
+    </section>:<Empty title="Рейтинг появится после публикации плана"/>}
   </>;
 }
