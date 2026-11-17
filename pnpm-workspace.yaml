@@ -4,3 +4,6 @@ allowBuilds:
   esbuild: true
   prisma: true
   sharp: true
+overrides:
+  'next>postcss': 8.5.32
+  '@prisma/config>deepmerge-ts': 8.0.0

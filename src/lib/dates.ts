@@ -1,5 +1,6 @@
 export const zone = process.env.APP_TIMEZONE || "Asia/Vladivostok";
-export const dayKey = (date: Date) => new Intl.DateTimeFormat("en-CA", {timeZone:zone, year:"numeric", month:"2-digit", day:"2-digit"}).format(date);
+const dayFormatter=new Intl.DateTimeFormat("en-CA", {timeZone:zone, year:"numeric", month:"2-digit", day:"2-digit"});
+export const dayKey = (date: Date) => dayFormatter.format(date);
 export function addDays(day: string, days: number) {
   const date = new Date(day + "T12:00:00Z");
   date.setUTCDate(date.getUTCDate() + days);

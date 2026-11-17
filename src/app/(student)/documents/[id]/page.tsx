@@ -12,5 +12,6 @@ export default async function Document({params}:{params:Promise<{id:string}>}){
   const item=await db.documentRequest.findFirst({where:{id:id.data,studentId:user.id},include:{history:{orderBy:[{createdAt:"asc"},{id:"asc"}],include:{actor:{select:{name:true}}}}}});
   if(!item) notFound();
   return <><Back href="/documents" label="К заявкам"/><SectionTitle title={"Заявка № "+item.number} subtitle={documentTypes[item.type]}/>
+  {item.status==="SUBMITTED"&&<p className="form-feedback success" role="status">Заявка успешно отправлена.</p>}
   <div className="dashboard-grid">{item.status==="DRAFT"?<RequestForm item={item} student={{name:user.name,year:user.student.year,program:user.student.program}}/>:<section className="card"><CardHeader title="Данные заявки" icon={FileText}/><DocumentStatus status={item.status}/><RequestDetails item={item}/></section>}<DocumentTimeline history={item.history}/></div></>;
 }

@@ -7,6 +7,7 @@ import { saveCoursePlan } from "@/lib/courses";
 import { publishGradebook } from "@/lib/gradebook";
 import { createSlot,reserveSlot,updateBooking,setSlotClosed } from "@/lib/consultations";
 import { setCourseEntry,decideParticipation } from "@/lib/calendar";
+import { acceptsOrigin,readBoundedText } from "@/lib/request";
 const uuid=z.string().uuid(),revision=z.coerce.number().int().min(0);
 const optionalId=z.union([uuid,z.literal("")]).optional();
 const resultStatus=z.enum(["GRADED","WAITING","MISSED"]),confirmation=z.literal("on").optional();
@@ -41,13 +42,11 @@ function gradebookReply(result:Awaited<ReturnType<typeof publishGradebook>>,mess
   return reply("Проверьте баллы и статусы в ведомости.",400);
 }
 export async function POST(request:Request) {
-  const scheme=process.env.NODE_ENV==="production"&&process.env.AUTH_LOCAL_HTTP!=="1"?"https":"http";
-  const origin=process.env.AUTH_URL?new URL(process.env.AUTH_URL).origin:scheme+"://"+request.headers.get("host");
-  if(request.headers.get("origin")!==origin) return reply("Действие недоступно.",403);
+  if(!acceptsOrigin(request)) return reply("Действие недоступно.",403);
   const user=await getUser();
   if(!user) return reply("Войдите в кабинет снова.",401);
-  const body=await request.text();
-  if(body.length>250000) return reply("Слишком большой запрос.",413);
+  const body=await readBoundedText(request,250000);
+  if(body===null) return reply("Слишком большой запрос.",413);
   let json:unknown;
   try {json=JSON.parse(body);} catch {return reply("Проверьте данные формы.",400);}
   const parsed=schema.safeParse(json);
@@ -58,7 +57,7 @@ export async function POST(request:Request) {
     switch(data.operation){
       case "book":
         if(!student) break;
-        return await reserveSlot(user.id,data.slotId,data.topic,data.comment,data.id)?reply("Запрос отправлен.",200,"/consultations"):reply("Слот уже занят или недоступен. Обновите страницу.",409);
+        return await reserveSlot(user.id,data.slotId,data.topic,data.comment,data.id)?reply("Консультация ожидает подтверждения.",200,"/consultations"):reply("Слот уже занят или недоступен. Обновите страницу.",409);
       case "bookingStatus":
         if(!student&&!teacher) break;
         return await updateBooking(user,{...data,slotId:data.slotId||undefined})?reply("Статус обновлён."):reply("Запись недоступна или уже изменилась.",404);
@@ -79,7 +78,7 @@ export async function POST(request:Request) {
         if(!teacher) break;
         if(data.intent==="publish"&&(data.reason.length<3||!data.plan.activities.length)) return reply("Добавьте мероприятие и укажите причину публикации.",400);
         return await saveCoursePlan(data.subjectId,user.id,data.revision,data.plan,data.intent==="publish"?data.reason:undefined)
-          ?reply(data.intent==="publish"?"Версия плана опубликована.":"Черновик сохранён."):reply("Курс недоступен или черновик уже изменился.",409);
+          ?reply(data.intent==="publish"?"План курса обновлён.":"Черновик сохранён."):reply("Курс недоступен или черновик уже изменился.",409);
       case "result":
         if(!teacher) break;
         return await publishGradebook(user.id,{kind:"activity",subjectId:data.subjectId,activityId:data.activityId,
@@ -95,7 +94,9 @@ export async function POST(request:Request) {
         return gradebookReply(await publishGradebook(user.id,{kind:"activity",...data}),"Результаты сохранены.");
       case "calendarActivity":
         if(!student) break;
-        return await setCourseEntry(user.id,data.subjectId,data.activityId,data.choice)?reply("Календарь обновлён."):reply("Мероприятие недоступно.",404);
+        return await setCourseEntry(user.id,data.subjectId,data.activityId,data.choice)
+          ?reply(data.choice==="add"?"Мероприятие добавлено в календарь.":data.choice==="remove"?"Личная отметка снята.":"Выбор участия сохранён.")
+          :reply("Мероприятие недоступно.",404);
       case "reminder":{
         if(!student) break;
         const startsAt=fromLocal(data.start);

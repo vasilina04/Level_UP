@@ -1,25 +1,28 @@
 import { db } from "@/lib/db";
 import { studentCourses,studentCourse } from "@/lib/courses";
 import { parsePlan,activityKinds } from "@/lib/course-data";
-import { scheduleFor } from "@/lib/queries";
+import { scheduleFor,scheduleRange } from "@/lib/queries";
 import { dayKey, timeLabel } from "@/lib/dates";
+import { bookingLabels } from "@/lib/consultations";
 export const calendarTypes={class:"Занятия",checkpoint:"Контрольные точки",exam:"Зачёты и экзамены",consultation:"Консультации",extra:"Дополнительные мероприятия",personal:"Личные напоминания"} as const;
 type Item={id:string,type:keyof typeof calendarTypes,title:string,start:Date,end?:Date,href?:string,detail:string,change?:string,pinned?:boolean};
 export async function calendarFor(studentId:string,groupId:string,first:string,last:string) {
+  const bounds=scheduleRange(first,last),range={gte:new Date(bounds.gte),lt:new Date(bounds.lt)};
   const [classes,courses,bookings,entries,exams]=await Promise.all([
     scheduleFor(groupId,first,last),studentCourses(studentId),
-    db.consultationBooking.findMany({where:{studentId,status:"CONFIRMED"},include:{slot:{include:{teacher:{select:{name:true}}}}}}),
-    db.calendarEntry.findMany({where:{studentId}}),
-    db.exam.findMany({where:{enrollment:{studentId}},include:{enrollment:{include:{subject:true}}}}),
+    db.consultationBooking.findMany({where:{studentId,status:{in:["CONFIRMED","COMPLETED"]},slot:{startsAt:range}},include:{slot:{include:{teacher:{select:{name:true}}}}}}),
+    db.calendarEntry.findMany({where:{studentId,OR:[{activityId:{not:null}},{startsAt:range}]}}),
+    db.exam.findMany({where:{enrollment:{studentId},start:range},include:{enrollment:{include:{subject:true}}}}),
   ]);
+  const pins=new Map(entries.flatMap(item=>item.activityId?[[`${item.subjectId}:${item.activityId}`,item] as const]:[]));
+  const plans=new Map(courses.map(course=>[course.id,(course.subject.plan?.versions??[]).map(version=>parsePlan(version.data))]));
   const items:Item[]=classes.map(item=>({id:item.id,type:"class",title:item.subject.title,start:item.start,end:item.end,
     href:"/schedule?day="+dayKey(item.start),detail:item.kind+" · "+item.room,
     change:item.cancelled?"Отменено":item.note??undefined}));
   for(const course of courses){
-    const versions=course.subject.plan?.versions??[];
-    const plan=parsePlan(versions[0]?.data),old=parsePlan(versions[1]?.data);
+    const [plan,old]=plans.get(course.id)??[];
     for(const activity of plan?.activities??[]){
-      const entry=entries.find(item=>item.subjectId===course.subjectId&&item.activityId===activity.id);
+      const entry=pins.get(`${course.subjectId}:${activity.id}`);
       if(activity.optional&&(!entry?.participation||(activity.registration&&entry.registrationStatus!=="CONFIRMED"))) continue;
       const previous=old?.activities.find(item=>item.id===activity.id);
       const moved=previous&&previous.startsAt!==activity.startsAt ? new Date(previous.startsAt):null;
@@ -30,31 +33,31 @@ export async function calendarFor(studentId:string,groupId:string,first:string,l
     }
   }
   for(const exam of exams){
-    const versions=courses.find(c=>c.id===exam.enrollmentId)?.subject.plan?.versions??[];
-    const plan=parsePlan(versions[0]?.data),previous=parsePlan(versions[1]?.data);
+    const [plan,previous]=plans.get(exam.enrollmentId)??[];
     const kind=exam.kind==="Зачёт"?"CREDIT":"EXAM";
     if(plan?.activities.some(activity=>activity.examId===exam.id||(activity.kind===kind&&(
       +new Date(activity.startsAt)===+exam.start||previous?.activities.some(item=>item.id===activity.id&&+new Date(item.startsAt)===+exam.start)
     )))) continue;
     items.push({id:exam.id,type:"exam",title:exam.enrollment.subject.title,start:exam.start,href:"/grades",detail:exam.kind+" · "+exam.room});
   }
-  for(const booking of bookings) items.push({id:booking.id,type:"consultation",title:booking.topic,start:booking.slot.startsAt,end:booking.slot.endsAt,href:"/consultations",detail:booking.slot.teacher.name+" · "+(booking.slot.format==="ONLINE"?"Онлайн":booking.slot.location)});
+  for(const booking of bookings) items.push({id:booking.id,type:"consultation",title:booking.topic,start:booking.slot.startsAt,end:booking.slot.endsAt,href:"/consultations",
+    detail:booking.slot.teacher.name+" · "+(booking.slot.format==="ONLINE"?"Онлайн":booking.slot.location)+" · "+bookingLabels[booking.status]});
   for(const entry of entries) if(!entry.activityId&&entry.startsAt&&entry.title) items.push({id:entry.id,type:"personal",title:entry.title,start:entry.startsAt,detail:"Личное напоминание"});
   return items.filter(item=>{const day=dayKey(item.start);return day>=first&&day<=last;}).sort((a,b)=>+a.start-+b.start);
 }
 export async function setCourseEntry(studentId:string,subjectId:string,activityId:string,choice:"add"|"remove"|"join"|"skip") {
   const enrollment=await studentCourse(studentId,subjectId);
   const activity=parsePlan(enrollment?.subject.plan?.versions[0]?.data)?.activities.find(item=>item.id===activityId);
-  if(!activity||(["join","skip"].includes(choice)&&!activity.optional)) return false;
-  const where={studentId_subjectId_activityId:{studentId,subjectId,activityId}};
-  if(choice==="remove") await db.calendarEntry.deleteMany({where:where.studentId_subjectId_activityId});
-  else {
-    const participation=choice==="join"?true:choice==="skip"?false:null;
-    const registrationStatus=participation&&activity.registration?"PENDING":null;
-    const current=await db.calendarEntry.findUnique({where});
-    if(current?.participation===participation) return true;
-    await db.calendarEntry.upsert({where,update:{participation,registrationStatus},create:{...where.studentId_subjectId_activityId,participation,registrationStatus}});
-  }
+  if(!activity||activity.optional!==(choice==="join"||choice==="skip")) return false;
+  const where={studentId,subjectId,activityId};
+  if(choice==="remove") {await db.calendarEntry.deleteMany({where});return true;}
+  const participation=choice==="join"?true:choice==="skip"?false:null;
+  const registrationStatus=participation&&activity.registration?"PENDING":null;
+  await db.$transaction(async tx=>{
+    const created=await tx.calendarEntry.createMany({data:{...where,participation,registrationStatus},skipDuplicates:true});
+    if(!created.count&&participation!==null) await tx.calendarEntry.updateMany({where:{...where,OR:[{participation:null},{participation:!participation}]},
+      data:{participation,registrationStatus}});
+  });
   return true;
 }
 export async function decideParticipation(teacherId:string,id:string,status:"CONFIRMED"|"REJECTED"){

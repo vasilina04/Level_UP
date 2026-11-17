@@ -221,7 +221,7 @@ test("a published course stays immutable and its calendar, reminders and results
   }
 });
 
-test("an optional event enters the calendar only after the teacher approves participation", async ({ page, browser }) => {
+test("an optional event enters the calendar only after the teacher approves participation", async ({ page, browser, baseURL }) => {
   const teacherUser = await db.user.findUniqueOrThrow({ where: { login: "teacher1" } });
   const student = await db.user.findUniqueOrThrow({ where: { login: "student1" } });
   const subject = await db.subject.findFirstOrThrow({ where: { instructorId: teacherUser.id, enrollments: { some: { studentId: student.id } } },
@@ -246,6 +246,11 @@ test("an optional event enters the calendar only after the teacher approves part
     await page.goto(dayUrl);
     await page.getByRole("link", { name: extra.title, exact: true }).click();
     await expect(page.getByText("Участие подтверждено", { exact: true })).toBeVisible();
+    const post=(choice:string)=>page.request.post("/api/academic-planning",{headers:{origin:new URL(baseURL!).origin},
+      data:{operation:"calendarActivity",subjectId:subject.id,activityId:extra.id,choice}});
+    expect((await post("add")).status()).toBe(404);
+    expect((await post("join")).status()).toBe(200);
+    expect((await db.calendarEntry.findFirstOrThrow({where})).registrationStatus).toBe("CONFIRMED");
     await page.getByRole("button", { name: "Не участвовать", exact: true }).click();
     await expect(page.getByText("Вы отказались от участия", { exact: true })).toBeVisible();
     await page.goto(dayUrl);

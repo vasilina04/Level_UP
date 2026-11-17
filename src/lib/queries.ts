@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { cache } from "react";
 import { db } from "@/lib/db";
 import { dayKey, addDays } from "@/lib/dates";
 import { levelFor } from "@/lib/rules";
@@ -6,13 +7,13 @@ import { checkpointProgress, weightedMean } from "@/lib/weights";
 
 export const questsFor = (studentId:string) => db.quest.findMany({where:{studentId},orderBy:{due:"asc"},include:{completion:true,enrollment:{include:{subject:true}}}});
 export const gradesFor = (studentId:string) => db.enrollment.findMany({where:{studentId},include:{subject:true,grades:{orderBy:{assessedAt:"asc"}},assessments:{orderBy:{due:"asc"}},exams:{orderBy:{start:"asc"}}},orderBy:{subject:{title:"asc"}}});
-export async function statsFor(studentId:string) {
+export const statsFor=cache(async (studentId:string)=>{
   const [xp,points] = await Promise.all([
     db.xpEvent.aggregate({where:{studentId},_sum:{amount:true}}),
-    db.assessment.findMany({where:{enrollment:{studentId}},select:{title:true,due:true,weight:true,passedAt:true},orderBy:{due:"asc"}}),
+    db.assessment.findMany({where:{enrollment:{studentId}},select:{weight:true,passedAt:true}}),
   ]);
-  return {xp:levelFor(xp._sum.amount??0),...checkpointProgress(points),closest:points.find(point=>!point.passedAt)};
-}
+  return {xp:levelFor(xp._sum.amount??0),...checkpointProgress(points)};
+});
 export const stagesFor = (studentId:string) => db.semesterStage.findMany({where:{assessments:{some:{enrollment:{studentId}}}},orderBy:{position:"asc"},include:{
   assessments:{where:{enrollment:{studentId}},orderBy:{due:"asc"},include:{enrollment:{include:{subject:true}}}},
   progress:{where:{studentId}},

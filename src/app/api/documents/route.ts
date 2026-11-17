@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getUser } from "@/lib/access";
 import { saveDocument } from "@/lib/documents";
 import { documentTypes } from "@/lib/rules";
+import { acceptsOrigin,readBoundedText } from "@/lib/request";
 const fields=z.object({
   id:z.string().uuid(),
   type:z.custom<keyof typeof documentTypes>(v=>typeof v==="string"&&Object.hasOwn(documentTypes,v)),
@@ -16,16 +17,13 @@ const fields=z.object({
 });
 const fail=(message:string,status:number)=>Response.json({message},{status});
 export async function POST(request:Request) {
-  const scheme=process.env.NODE_ENV==="production"&&process.env.AUTH_LOCAL_HTTP!=="1"?"https":"http";
-  const expected=process.env.AUTH_URL ? new URL(process.env.AUTH_URL).origin : scheme+"://"+request.headers.get("host");
-  if(request.headers.get("origin")!==expected) return fail("Действие недоступно.",403);
+  if(!acceptsOrigin(request)) return fail("Действие недоступно.",403);
   const user=await getUser();
   if(!user) return fail("Сессия завершена. Войдите в кабинет снова.",401);
   if(user.role!=="STUDENT"||!user.student) return fail("Действие недоступно.",403);
   if(!request.headers.get("content-type")?.startsWith("application/x-www-form-urlencoded")) return fail("Неверный формат заявки.",415);
-  if(Number(request.headers.get("content-length"))>30_000) return fail("Заявка слишком длинная.",413);
-  const body=await request.text();
-  if(body.length>30_000) return fail("Заявка слишком длинная.",413);
+  const body=await readBoundedText(request,30000);
+  if(body===null) return fail("Заявка слишком длинная.",413);
   const parsed=fields.safeParse(Object.fromEntries(new URLSearchParams(body)));
   if(!parsed.success) return fail("Проверьте тип документа и длину полей.",400);
   const {intent,confirmed,delivery,contactEmail,contactPhone,postalAddress,...values}=parsed.data;

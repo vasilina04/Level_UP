@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { activityKinds, type Activity,type Plan } from "@/lib/course-data";
+import type { Activity,Plan } from "@/lib/course-data";
+import { activityKinds } from "@/lib/course-ui-data";
 import { PlanningForm } from "@/components/planning-form";
 import { Button } from "@/components/ui/button";
 const initialActivity=(id:string,date:string):Activity=>({id,title:"",kind:"CONTROL",startsAt:date,place:"",format:"Очно",description:"",topics:"",requirements:"",max:20,weight:1,optional:false,registration:false,materials:""});

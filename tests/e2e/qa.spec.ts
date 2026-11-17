@@ -267,7 +267,9 @@ test("staff documents follow approval, ready and rejection paths while drafts st
     await page.goto("/staff/"+id);
     await page.getByLabel("Новый статус").selectOption(status);
     await page.getByLabel("Комментарий").fill(comment);
-    await page.getByRole("button",{name:"Обновить статус"}).click();
+    const submit=page.getByRole("button",{name:"Обновить статус"});
+    if(status==="REJECTED"&&!comment) await submit.click();
+    else await Promise.all([page.waitForEvent("domcontentloaded"),submit.click()]);
   }
   try {
     await login(page,"staff");

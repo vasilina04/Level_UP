@@ -5,10 +5,27 @@ import { z } from "zod";
 import { cache } from "react";
 export const isUuid=(id:unknown):id is string=>z.string().uuid().safeParse(id).success;
 
-export function studentCourses(studentId:string) {
-  return db.enrollment.findMany({where:{studentId},orderBy:{subject:{title:"asc"}},include:{courseResults:true,
-    assessments:{select:{id:true,title:true,passedAt:true,quest:{select:{id:true}}}},
-    subject:{include:{plan:{include:{versions:{orderBy:{number:"desc"},take:2}}}}}}});
+export const studentCourses=cache((studentId:string)=>
+  db.enrollment.findMany({where:{studentId},orderBy:{subject:{title:"asc"}},include:{courseResults:true,
+    assessments:{select:{id:true,title:true,due:true,passedAt:true,quest:{select:{id:true}}}},
+    subject:{include:{plan:{include:{versions:{orderBy:{number:"desc"},take:2}}}}}}})
+);
+
+export async function nextCourseDeadline(studentId:string,now:Date) {
+  const courses=await studentCourses(studentId);
+  const deadlines=courses.flatMap(course=>{
+    const plan=parsePlan(course.subject.plan?.versions[0]?.data);
+    const linked=new Set(plan?.activities.flatMap(activity=>activity.checkpointTitle?[activity.checkpointTitle]:[]));
+    const completed=new Set(course.assessments.filter(point=>point.passedAt).map(point=>point.title));
+    const settled=new Set(course.courseResults.filter(row=>row.status!=="WAITING").map(row=>row.activityId));
+    return [
+      ...(plan?.activities??[]).filter(activity=>!activity.optional&&!settled.has(activity.id)&&!completed.has(activity.checkpointTitle??""))
+        .map(activity=>({title:activity.title,subject:course.subject.title,due:new Date(activity.startsAt),href:`/courses/${course.subjectId}/map/${activity.id}`})),
+      ...course.assessments.filter(point=>!point.passedAt&&!linked.has(point.title))
+        .map(point=>({title:point.title,subject:course.subject.title,due:point.due,href:`/checkpoints/${point.id}`})),
+    ];
+  });
+  return deadlines.filter(item=>item.due>=now).sort((a,b)=>+a.due-+b.due)[0];
 }
 export async function studentCourse(studentId:string,subjectId:string,history=false) {
   if(!isUuid(subjectId)) return null;

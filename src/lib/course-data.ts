@@ -1,9 +1,7 @@
 import { z } from "zod";
 import { dateLabel } from "./dates";
-export const activityKinds={
-  LAB:"Лабораторная работа", CONTROL:"Контрольная работа", TEST:"Тестирование", PRACTICE:"Практическое задание",
-  PROJECT:"Защита проекта", CREDIT:"Зачёт", EXAM:"Экзамен", EXTRA:"Дополнительное мероприятие",
-} as const;
+import { applyRule } from "./course-ui-data";
+export { activityKinds,applyRule,courseGrade } from "./course-ui-data";
 const uuid=z.string().uuid();
 export const activitySchema=z.object({
   id:uuid,title:z.string().trim().min(2).max(120),
@@ -49,13 +47,6 @@ export function ratingFor(plan:Plan,results:ResultRow[]) {
   const potential=remainingRegular+(rule?Math.min(Math.max(0,rule.bonus-bonusEarned),remainingBonus):remainingBonus);
   return {rows,remaining,earned:current,potential,score:rule?applyRule(rule,current):null,
     maximum:rule?applyRule(rule,current+potential):null,bonusEarned};
-}
-export function applyRule(rule:Rule,value:number) {
-  const capped=Math.min(rule.cap,value);
-  return rule.rounding==="FLOOR"?Math.floor(capped):rule.rounding==="NEAREST"?Math.round(capped):Math.round(capped*100)/100;
-}
-export function courseGrade(rule:Rule,value:number) {
-  return value>=rule.excellent?5:value>=rule.good?4:value>=rule.pass?3:2;
 }
 const labels:Record<keyof Activity,string>={id:"Идентификатор",title:"Название",kind:"Тип",startsAt:"Дата и время",place:"Место",format:"Формат",description:"Описание",topics:"Темы",requirements:"Требования",max:"Максимум баллов",weight:"Вес",optional:"Дополнительное",registration:"Регистрация",materials:"Материалы",checkpointTitle:"Связь с контрольной точкой",examId:"Связь с сессией"};
 export function planDiff(before:Plan|null,current:Plan) {

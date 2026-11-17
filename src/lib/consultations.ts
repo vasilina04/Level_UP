@@ -17,9 +17,9 @@ export async function createSlot(teacherId:string,startsAt:Date,endsAt:Date,form
 }
 export async function reserveSlot(studentId:string,slotId:string,topic:string,comment:string,id:string) {
   return db.$transaction(async tx=>{
-    const existing=await tx.consultationBooking.findFirst({where:{id,studentId,slotId,topic,comment}});
-    if(existing) return true;
     await tx.$queryRaw`SELECT id FROM "ConsultationSlot" WHERE id=${slotId}::uuid FOR UPDATE`;
+    const existing=await tx.consultationBooking.findFirst({where:{id,studentId,slotId,topic,comment},select:{id:true}});
+    if(existing) return true;
     const slot=await tx.consultationSlot.findFirst({where:{id:slotId,...upcomingSlots(),
       teacher:{role:"TEACHER",taughtSubjects:{some:{enrollments:{some:{studentId}}}}}},select:{id:true}});
     if(!slot) return false;
