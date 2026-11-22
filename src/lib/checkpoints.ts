@@ -12,7 +12,8 @@ export async function sendCheckpointMessage(data:{id:string,assessmentId:string,
   return db.$transaction(async tx=>{
     const point=await tx.assessment.findFirst({where:scope,include:{enrollment:{include:{subject:{include:{instructor:{select:{role:true}}}}}}}});
     if(!point||point.enrollment.subject.instructor?.role!=="TEACHER") return "denied";
-    if(user.role==="TEACHER"&&!await tx.checkpointMessage.count({where:{assessmentId:point.id,authorId:point.enrollment.studentId}})) return "denied";
+    if(user.role==="TEACHER"&&!await tx.checkpointMessage.count({where:{assessmentId:point.id,authorId:point.enrollment.studentId}})&&
+      !await tx.checkpointSubmission.count({where:{assessmentId:point.id}})) return "denied";
     const row={id:data.id,assessmentId:point.id,authorId:user.id,body:data.body};
     const created=await tx.checkpointMessage.createMany({data:[row],skipDuplicates:true});
     if(!created.count){

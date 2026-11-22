@@ -7,7 +7,7 @@ export const isUuid=(id:unknown):id is string=>z.string().uuid().safeParse(id).s
 
 export const studentCourses=cache((studentId:string)=>
   db.enrollment.findMany({where:{studentId},orderBy:{subject:{title:"asc"}},include:{courseResults:true,
-    assessments:{select:{id:true,title:true,due:true,passedAt:true,quest:{select:{id:true}}}},
+    assessments:{select:{id:true,title:true,due:true,passedAt:true,weight:true,workStatus:true,quest:{select:{id:true}}}},
     subject:{include:{plan:{include:{versions:{orderBy:{number:"desc"},take:2}}}}}}})
 );
 
@@ -29,7 +29,7 @@ export async function nextCourseDeadline(studentId:string,now:Date) {
 }
 export async function studentCourse(studentId:string,subjectId:string,history=false) {
   if(!isUuid(subjectId)) return null;
-  return db.enrollment.findUnique({where:{studentId_subjectId:{studentId,subjectId}},include:{courseResults:true,assessments:{select:{id:true,title:true,passedAt:true}},
+  return db.enrollment.findUnique({where:{studentId_subjectId:{studentId,subjectId}},include:{courseResults:true,assessments:{select:{id:true,title:true,due:true,passedAt:true,weight:true,workStatus:true}},
     subject:{include:{plan:{include:{versions:{orderBy:{number:"desc"},take:history?undefined:2,include:{author:{select:{name:true}}}}}}}}}});
 }
 export async function saveCoursePlan(subjectId:string,teacherId:string,revision:number,plan:Plan,reason?:string) {

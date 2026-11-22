@@ -411,6 +411,8 @@ input:not([type=checkbox]):not([type=hidden]),textarea,select{border-color:var(-
 .course-node{display:grid;align-items:center;grid-template-columns:auto minmax(0,1fr) auto;gap:12px}
 .course-node:hover{border-color:var(--accent)}
 .course-node-marker{color:var(--accent)}
+.course-node>div{min-width:0;overflow-wrap:anywhere}
+.course-node>.pill-row{flex-wrap:wrap}
 .calendar-month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .calendar-month a{min-height:42px;display:grid;place-items:center;border:1px solid var(--line);border-radius:7px}
 .calendar-month a:hover{background:var(--surface)}
@@ -418,7 +420,7 @@ input:not([type=checkbox]):not([type=hidden]),textarea,select{border-color:var(-
 .rating-numbers{display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between}
 .rating-numbers div{display:grid}
 .rating-numbers strong{font-size:28px}
-@media(max-width:580px){.course-node{grid-template-columns:auto minmax(0,1fr)}.course-node>.pill{grid-column:2;justify-self:start}.planning-buttons>*{max-width:100%}}
+@media(max-width:580px){.course-node{grid-template-columns:auto minmax(0,1fr)}.course-node>.pill,.course-node>.pill-row{grid-column:2;justify-self:start}.planning-buttons>*{max-width:100%}}
 @media(max-width:580px){.request-contacts{grid-template-columns:minmax(0,1fr)}}
 @keyframes menu-in{from{opacity:0;translate:0 5px}}
 @media(max-width:1100px){.shell{grid-template-columns:196px minmax(0,1fr)}.card{padding:16px}}

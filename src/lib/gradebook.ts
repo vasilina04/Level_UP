@@ -60,6 +60,8 @@ async function storeResult(tx:Prisma.TransactionClient,teacherId:string,enrollme
   if(row.confirmCheckpoint) {
     const confirmed=await tx.assessment.updateMany({where:{enrollmentId:enrollment.id,title:activity.checkpointTitle!,passedAt:null},data:{passedAt:new Date()}});
     checkpointConfirmed=confirmed.count>0;
+    await tx.checkpointSubmission.updateMany({where:{status:"SUBMITTED",assessment:{enrollmentId:enrollment.id,title:activity.checkpointTitle!}},
+      data:{status:"APPROVED",reviewerId:teacherId,reviewedAt:new Date(),points,comment:"Выполнение подтверждено преподавателем в ведомости."}});
     if(checkpointConfirmed) await synchronizeProgress(tx,enrollment.studentId);
   }
   if(changed||checkpointConfirmed) {

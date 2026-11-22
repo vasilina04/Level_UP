@@ -28,7 +28,7 @@ async function inspect(page:Page,info:TestInfo,role:string,pages:{path:string;na
   page.on("console",entry=>{
     if(entry.type()==="warning"||entry.type()==="error") browserMessages.push({path:page.url(),kind:entry.type(),message:entry.text()});
   });
-  if(evidence) await mkdir(join(evidence,"mobile"),{recursive:true});
+  if(evidence) for(const width of [360,390,768,1440]) await mkdir(join(evidence,String(width)),{recursive:true});
   for(const width of widths) {
     await page.setViewportSize({width,height:844});
     for(const item of pages) {
@@ -55,7 +55,12 @@ async function inspect(page:Page,info:TestInfo,role:string,pages:{path:string;na
           const audit=await new AxeBuilder({page}).withTags(wcag).analyze();
           for(const failure of audit.violations) issues.push({path,width,problem:`axe ${failure.id} · ${failure.nodes.map(node=>node.target.join(" ")).join(", ")}`});
         }
-        if(evidence) await page.screenshot({path:join(evidence,"mobile",`${role}-${item.name}.png`),fullPage:true,animations:"disabled"});
+      }
+      if(evidence&&[360,390,768,1440].includes(width)) {
+        await page.evaluate(()=>window.scrollTo(0,0));
+        const target=join(evidence,String(width),`${role}-${item.name}`);
+        await page.screenshot({path:target+".png",fullPage:true,animations:"disabled"});
+        await page.screenshot({path:target+".jpg",type:"jpeg",quality:85,fullPage:true,animations:"disabled"});
       }
     }
   }
@@ -67,7 +72,7 @@ async function inspect(page:Page,info:TestInfo,role:string,pages:{path:string;na
 }
 
 test("student screens across seven widths with mobile evidence",async({page},info)=>{
-  test.setTimeout(220000);
+  test.setTimeout(360000);
   const [teacher,student]=await Promise.all([db.user.findUniqueOrThrow({where:{login:"teacher1"}}),db.user.findUniqueOrThrow({where:{login:"student1"}})]);
   const enrollment=await db.enrollment.findFirstOrThrow({where:{studentId:student.id,subject:{instructorId:teacher.id}},include:{subject:{include:{plan:{include:{versions:{orderBy:{number:"desc"},take:1}}}}},assessments:true}});
   const activity=parsePlan(enrollment.subject.plan?.versions[0]?.data)!.activities[0];
@@ -90,7 +95,7 @@ test("student screens across seven widths with mobile evidence",async({page},inf
 });
 
 test("teacher and staff screens across seven widths with mobile evidence",async({page},info)=>{
-  test.setTimeout(180000);
+  test.setTimeout(300000);
   const teacher=await db.user.findUniqueOrThrow({where:{login:"teacher1"}});
   const subject=await db.subject.findFirstOrThrow({where:{instructorId:teacher.id,enrollments:{some:{}}}});
   await login(page,"teacher1","LevelUpTeacher1!",/\/teacher$/);

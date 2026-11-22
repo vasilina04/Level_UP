@@ -79,6 +79,7 @@ model User {
   teacherProfile     TeacherProfile?
   consultationSlots  ConsultationSlot[]
   courseVersions     CoursePlanVersion[]
+  submissionReviews  CheckpointSubmission[]
 }
 
 model Faculty {
@@ -224,6 +225,8 @@ model Assessment {
   instructions String?
   messages     CheckpointMessage[]
   quest        Quest?
+  workStatus   String              @default("NOT_STARTED")
+  submissions  CheckpointSubmission[]
 
   @@index([enrollmentId, due])
 }
@@ -239,6 +242,23 @@ model CheckpointMessage {
 
   @@index([assessmentId, createdAt])
   @@index([authorId])
+}
+
+model CheckpointSubmission {
+  id           String     @id @db.Uuid
+  assessmentId String     @db.Uuid
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  body         String
+  status       String     @default("SUBMITTED")
+  submittedAt  DateTime   @default(now())
+  reviewedAt   DateTime?
+  reviewerId   String?    @db.Uuid
+  reviewer     User?      @relation(fields: [reviewerId], references: [id], onDelete: SetNull)
+  comment      String?
+  points       Int?
+  grade        Int?
+
+  @@index([assessmentId, submittedAt])
 }
 
 model Exam {

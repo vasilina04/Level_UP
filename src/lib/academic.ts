@@ -14,6 +14,8 @@ export async function confirmAssessment(assessmentId: string, staffId: string) {
     await lockStudent(tx,studentId);
     const result = await tx.assessment.updateMany({where:{id:assessmentId,passedAt:null},data:{passedAt:new Date()}});
     if (!result.count) return true;
+    await tx.checkpointSubmission.updateMany({where:{assessmentId,status:"SUBMITTED"},data:{status:"APPROVED",reviewerId:staffId,
+      reviewedAt:new Date(),comment:"Выполнение подтверждено деканатом в учебных данных."}});
     await tx.auditLog.create({data:{actorId:staffId,targetId:assessmentId,action:"assessment.confirm",details:{}}});
     await tx.notification.create({data:{userId:studentId,type:"GRADE",title:"Контрольная точка подтверждена",body:assessment.title,href:"/grades",eventKey:"assessment:"+assessmentId}});
     await synchronizeProgress(tx,studentId);
