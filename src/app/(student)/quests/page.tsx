@@ -19,7 +19,7 @@ export default async function Quests({searchParams}:{searchParams:Promise<{statu
     return q.due>=now&&(tab!=="soon"||+q.due<=+now+7*86_400_000);
   });
   if(params.sort==="desc") filtered.reverse();
-  return <><SectionTitle title="Квесты" subtitle="Учебные задания, личные цели и история выполнения."/>
+  return <><SectionTitle title="Квесты" subtitle="XP — за подтверждённые учебные работы. Личные задачи отмечаете вы сами, без награды."/>
   <div className="tabs" aria-label="Статусы квестов">{Object.entries(tabs).map(([key,label])=><Link key={key} aria-current={tab===key?"page":undefined} href={"/quests?"+new URLSearchParams({status:key,...(params.subject?{subject:params.subject}:{}),...(params.sort?{sort:params.sort}:{})})}>{label}</Link>)}</div>
   <form className="filter-bar"><input type="hidden" name="status" value={tab}/><label>Дисциплина<select name="subject" defaultValue={params.subject||""}><option value="">Все дисциплины</option>{subjects.map(([id,title])=><option key={id} value={id}>{title}</option>)}</select></label><label>Срок<select name="sort" defaultValue={params.sort||"asc"}><option value="asc">Сначала ближайшие</option><option value="desc">Сначала дальние</option></select></label><button className="button secondary">Применить</button></form>
   {filtered.length?<div className="dashboard-grid">{filtered.map(q=>{

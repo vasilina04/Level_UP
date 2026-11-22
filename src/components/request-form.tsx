@@ -2,12 +2,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { documentDelivery, documentTypes } from "@/lib/rules";
+import { documentDelivery, documentTypes, documentServices } from "@/lib/rules";
 type Delivery=keyof typeof documentDelivery;
 export function RequestFields({id,type,recipient,details,student,initialDelivery,email,phone,address}:{
   id:string,type:keyof typeof documentTypes,recipient?:string,details?:string,
   student:{name:string,year:number,program:string},initialDelivery?:Delivery,email?:string,phone?:string,address?:string,
 }) {
+  const [selectedType,setSelectedType]=useState(type);
+  const service=documentServices[selectedType];
   const [pending,setPending]=useState(false);
   const [ready,setReady]=useState(false);
   const [error,setError]=useState("");
@@ -39,7 +41,7 @@ export function RequestFields({id,type,recipient,details,student,initialDelivery
   }
   return <form method="post" className="stack" onSubmit={save}>
     <input type="hidden" name="id" value={id}/>
-    <label>Тип документа<select name="type" defaultValue={type}>{Object.entries(documentTypes).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+    <section className="service-description" aria-live="polite"><h3>{service.title}</h3><p>{service.description}</p><dl className="definition"><dt>Результат</dt><dd>{service.result}</dd><dt>Срок выполнения</dt><dd>Сотрудник уточняет срок при рассмотрении заявки. Статус доступен в разделе «Мои заявки».</dd><dt>Необходимые сведения</dt><dd>{service.required}</dd></dl><ol><li>Заполните заявку и проверьте данные.</li><li>Выберите способ получения и отправьте заявку.</li><li>Следите за статусом в личном кабинете.</li></ol></section><label>Тип документа<select name="type" value={selectedType} onChange={event=>setSelectedType(event.target.value as typeof type)}>{Object.entries(documentTypes).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
     <label>Адресат<input name="recipient" placeholder="Например, по месту требования" maxLength={150} minLength={2} required defaultValue={recipient}/></label>
     <label>Цель обращения<textarea name="details" rows={4} placeholder="Опишите, для чего нужен документ" maxLength={1500} minLength={5} required defaultValue={details}/></label>
     <label>Способ получения<select name="delivery" value={delivery} onChange={event=>setDelivery(event.target.value as Delivery)}>{Object.entries(documentDelivery).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>

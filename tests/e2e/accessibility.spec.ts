@@ -60,9 +60,9 @@ test("mobile menu closes on Escape and respects reduced motion",async({page})=>{
   await summary.click();
   await page.getByRole("heading",{name:"Привет, Марина!"}).click();
   await expect(nav.locator("details")).not.toHaveAttribute("open","");
-  await nav.getByRole("link",{name:"Карта",exact:true}).click();
-  await expect(page).toHaveURL(/semester-map$/);
-  expect(await page.locator(".map-step").first().evaluate(el=>getComputedStyle(el).transitionDuration)).toBe("0s");
+  await nav.getByRole("link",{name:"Зачётка",exact:true}).click();
+  await expect(page).toHaveURL(/grades$/);
+  expect(await page.locator(".subject summary").first().evaluate(el=>getComputedStyle(el).transitionDuration)).toBe("0s");
 });
 test("grade trend exposes the underlying grades at 360px",async({page})=>{
   await page.setViewportSize({width:360,height:800});

@@ -75,7 +75,7 @@ test("student screens across seven widths with mobile evidence",async({page},inf
   await inspect(page,info,"public",[{path:"/login",name:"login",axe:true}]);
   await login(page,"student1","LevelUpDemo1!",/dashboard$/);
   const pages=[
-    {path:"/dashboard",name:"dashboard",axe:true},{path:"/semester-map",name:"semester-map",axe:true},
+    {path:"/dashboard",name:"dashboard",axe:true},
     {path:"/quests",name:"quests"},{path:"/achievements",name:"achievements"},
     {path:"/schedule?view=week",name:"schedule",axe:true},{path:"/grades",name:"grades",axe:true},
     {path:"/calendar?view=month",name:"calendar",axe:true},{path:"/courses",name:"courses"},

@@ -79,21 +79,11 @@ for (const account of ["student1","student2"] as const) {
     const fixture = users[account], other = account==="student1"?"student2":"student1";
     await login(page,account);
     const main = page.getByRole("main");
-    await main.getByRole("link",{name:"Открыть карту семестра"}).click();
-    const continueStage=main.getByRole("link",{name:/Перейти к этапу/});
-    if(await continueStage.count()){
-      const target=await continueStage.getAttribute("href");
-      await continueStage.click();
-      await expect(page).toHaveURL(url=>url.pathname===target);
-      await main.getByRole("link",{name:"К карте семестра"}).click();
-    }
-    for (let stage=1;stage<=6;stage++) {
-      await main.locator('.map-step[href="/semester-map/'+stage+'"]').click();
-      await expect(page).toHaveURL(new RegExp("/semester-map/"+stage+"$"));
-      await expect(main.getByRole("heading",{name:"Контрольные точки"})).toBeVisible();
-      await main.getByRole("link",{name:"К карте семестра"}).click();
-      await expect(main.getByRole("heading",{name:"Карта семестра",exact:true})).toBeVisible();
-    }
+    await main.getByRole("link",{name:"Открыть зачётку"}).click();
+    await expect(main.getByRole("heading",{name:"Зачётка",exact:true})).toBeVisible();
+    await main.locator("summary").getByText(fixture.subject,{exact:true}).click();
+    await main.locator("details[open]").getByRole("link",{name:"План дисциплины"}).click();
+    await expect(page).toHaveURL(/\/courses\/[^/]+\/map$/);
     await nav(page).getByRole("link",{name:"Квесты"}).click();
     for (const filter of ["Активные","Ближайшие","Завершённые","Просроченные"]) {
       await main.getByRole("link",{name:filter,exact:true}).click();
@@ -116,13 +106,13 @@ for (const account of ["student1","student2"] as const) {
     await main.getByRole("navigation",{name:"Дни недели"}).getByRole("link").first().click();
     await expect(main.locator(".schedule-day")).toHaveCount(1);
     await expect(main.getByText(fixture.otherSubject,{exact:true})).toHaveCount(0);
-    await nav(page).getByRole("link",{name:"Успеваемость"}).click();
+    await nav(page).getByRole("link",{name:"Зачётка",exact:true}).click();
     await main.locator("summary").getByText(fixture.subject,{exact:true}).click();
     await expect(main.locator("details[open]").getByText(/баллов/).first()).toBeVisible();
     await expect(main.getByText(fixture.otherSubject,{exact:true})).toHaveCount(0);
     await nav(page).getByRole("link",{name:"Достижения"}).click();
     await expect(main.locator(".achievement")).toHaveCount(6);
-    await nav(page).getByRole("link",{name:"Заявки и справки"}).click();
+    await nav(page).getByRole("link",{name:"Единое окно"}).click();
     await main.getByRole("link",{name:"Новая заявка"}).click();
     await main.getByRole("link",{name:"К заявкам"}).click();
     await page.goto("/documents/"+key(key(other)+"document"));
@@ -311,8 +301,8 @@ test("mobile menu, skip link, profile shortcut and staff logout reach their targ
     await expect(page).toHaveURL(new RegExp("/"+path+"$"));
   }
   await mobile.getByText("Меню",{exact:true}).click();
-  await mobile.getByRole("link",{name:"Карта семестра"}).click();
-  await expect(page).toHaveURL(/\/semester-map$/);
+  await mobile.locator("details").getByRole("link",{name:"Зачётка",exact:true}).click();
+  await expect(page).toHaveURL(/\/grades$/);
   await expect(mobile.locator("details")).not.toHaveAttribute("open","");
   await page.getByRole("link",{name:"Открыть профиль"}).click();
   await page.getByRole("button",{name:"Выйти из аккаунта"}).click();

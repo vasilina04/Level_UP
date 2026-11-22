@@ -6,11 +6,11 @@ import {checkpointProgress,weightedMean} from "../../src/lib/weights";
 describe("XP thresholds",()=>{
   it.each([[0,1],[199,1],[200,2],[599,2],[600,3],[1199,3],[1200,4],[2000,5]])("%i XP maps to level %i",(xp,level)=>expect(levelFor(xp).level).toBe(level));
   it("uses XP earned within the current level",()=>expect(levelFor(1250)).toMatchObject({floor:1200,ceiling:2000,earned:50,target:800,percent:6}));
-  it("keeps all reward amounts configurable in one table",()=>expect(Object.values(xpRewards)).toEqual([30,70,200,150,500]));
+  it("keeps all reward amounts configurable in one table",()=>expect(Object.values(xpRewards)).toEqual([0,70,200,150,500]));
   it("uses the completion time for personal quests and the verified reward for academic quests",()=>{
     const due=new Date("2026-11-13T04:00:00Z"),later=new Date(+due+1000);
     expect(questReward("PERSONAL",due,null,later)).toBe(0);
-    expect(questReward("PERSONAL",due,due,later)).toBe(30);
+    expect(questReward("PERSONAL",due,due,later)).toBe(0);
     expect(questReward("LAB",due,later,later)).toBe(70);
   });
 });

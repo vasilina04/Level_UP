@@ -11,9 +11,9 @@ export function DocumentStatus({status}:{status:Status}) {return <StatusPill lab
 export function DocumentRow({item,staff=false,student}:{item:DocumentRequest,staff?:boolean,student?:string}) {
   return <Link className="data-row" href={(staff?"/staff":"/documents")+"/"+item.id}><IconTile icon={FileText}/><div className="row-content"><strong>{documentTypes[item.type]}</strong><small>№ {item.number} · {student||dateLabel(item.createdAt)}</small></div><DocumentStatus status={item.status}/><ChevronRight className="row-arrow" size={16}/></Link>;
 }
-export function RequestForm({item,student}:{item?:DocumentRequest,student:{name:string,year:number,program:string}}) {
+export function RequestForm({item,student,type="CERTIFICATE"}:{item?:DocumentRequest,type?:keyof typeof documentTypes,student:{name:string,year:number,program:string}}) {
   return <section className="card detail-card form-card"><CardHeader title="Данные заявки" icon={ClipboardList}/>
-  <RequestFields id={item?.id||randomUUID()} type={item?.type||"CERTIFICATE"} recipient={item?.recipient} details={item?.details} student={student}
+  <RequestFields id={item?.id||randomUUID()} type={item?.type||type} recipient={item?.recipient} details={item?.details} student={student}
     initialDelivery={item?.delivery??undefined} email={item?.contactEmail??undefined} phone={item?.contactPhone??undefined} address={item?.postalAddress??undefined}/></section>;
 }
 export function RequestDetails({item,studentName}:{item:DocumentRequest,studentName?:string}) {

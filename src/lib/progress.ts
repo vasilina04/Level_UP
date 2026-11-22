@@ -1,16 +1,16 @@
 import type { Prisma, XpKind } from "@prisma/client";
 import { dayKey, weekOf } from "@/lib/dates";
-import { achievementDefinitions, questReward, xpRewards } from "@/lib/rules";
+import { achievementDefinitions, xpRewards } from "@/lib/rules";
 
 export async function achievementMetrics(tx: Prisma.TransactionClient, studentId: string) {
   const [quests, stages, totalStages] = await Promise.all([
-    tx.quest.findMany({where:{studentId,completion:{isNot:null}},include:{completion:true}}),
+    tx.quest.findMany({where:{studentId,kind:{in:["LAB","CREDIT"]},assessment:{passedAt:{not:null}},completion:{isNot:null}},include:{completion:true}}),
     tx.studentSemesterProgress.count({where:{studentId}}),
     tx.assessment.findMany({where:{enrollment:{studentId}},select:{stageId:true},distinct:["stageId"]}),
   ]);
   return {
     first:quests.length, labs:quests.filter(q=>q.kind==="LAB").length,
-    timely:quests.filter(q=>q.kind==="PERSONAL" && q.completion!.completedAt<=q.due).length,
+    timely:quests.filter(q=>q.completion!.completedAt<=q.due).length,
     explorer:stages, finish:Number(totalStages.length>0 && stages===totalStages.length),
     weeks:new Set(quests.map(q=>weekOf(dayKey(q.completion!.completedAt)))).size,
   };
@@ -51,8 +51,7 @@ export async function lockStudent(tx: Prisma.TransactionClient, studentId: strin
 export async function completePersonal(tx: Prisma.TransactionClient, studentId: string, questId: string, completedAt: Date) {
   const quest=await tx.quest.findFirst({where:{id:questId,studentId,kind:"PERSONAL",assessmentId:null}});
   if (!quest) return false;
-  const inserted=await tx.questCompletion.createMany({data:[{questId,completedAt,confirmedBy:"STUDENT"}],skipDuplicates:true});
-  if (inserted.count && questReward(quest.kind,quest.due,completedAt,completedAt)) await awardXp(tx,studentId,"quest:"+questId,"PERSONAL",completedAt);
+  await tx.questCompletion.createMany({data:[{questId,completedAt,confirmedBy:"STUDENT"}],skipDuplicates:true});
   await synchronizeProgress(tx,studentId);
   return true;
 }

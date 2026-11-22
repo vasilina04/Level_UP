@@ -46,7 +46,7 @@ test("student isolation by role and ownership",async({page})=>{
   const foreign=await db.studentAchievement.count({where:{studentId:marina}});
   expect(foreign).toBeGreaterThan(0);
 });
-test("personal quest persists and awards XP once under concurrent submission",async({page,browser})=>{
+test("personal task persists without XP under concurrent submission",async({page,browser})=>{
   const questId=key(alex+"personal0");
   await db.questCompletion.deleteMany({where:{questId}});
   await db.xpEvent.deleteMany({where:{studentId:alex,eventKey:"quest:"+questId}});
@@ -63,7 +63,7 @@ test("personal quest persists and awards XP once under concurrent submission",as
     await expect(page.getByText(/Выполнен \d/)).toBeVisible();
     await expect(second.getByText(/Выполнен \d/)).toBeVisible();
     const events=await db.xpEvent.findMany({where:{studentId:alex,eventKey:"quest:"+questId}});
-    expect(events.map(e=>e.amount)).toEqual([30]);
+    expect(events.map(e=>e.amount)).toEqual([]);
   } finally { await duplicate.close(); }
 });
 test("staff confirmation closes an academic quest and unlocks an achievement",async({page,browser})=>{
@@ -175,8 +175,10 @@ test("responsive widths and mobile map",async({page})=>{
   }
   await page.setViewportSize({width:360,height:800});
   await page.goto("/semester-map");
-  await page.getByRole("link",{name:/Этап 4/}).click();
-  await expect(page.getByRole("heading",{name:"Курсовые"})).toBeVisible();
+  await expect(page).toHaveURL(/\/grades$/);
+  await page.locator("details.subject summary").first().click();
+  await page.getByRole("link",{name:"План дисциплины",exact:true}).first().click();
+  await expect(page).toHaveURL(/\/courses\/[^/]+\/map$/);
 });
 test("schedule edits preserve revisions and notify the student",async({page,browser})=>{
   const groupId=key("ИТ-201");
@@ -214,4 +216,29 @@ test("schedule edits preserve revisions and notify the student",async({page,brow
       db.scheduleEvent.update({where:{id:original.id},data:{teacherOverride:original.teacherOverride,teacherOverrideId:original.teacherOverrideId,note:original.note,revision:original.revision}}),
     ]);
   }
+});
+
+
+test("single window preserves the selected service and validates delivery contacts",async({page})=>{
+  await login(page);
+  await expect(page).toHaveURL(/dashboard$/);
+  await page.goto("/documents");
+  await expect(page.getByRole("heading",{name:"Единое окно",exact:true})).toBeVisible();
+  const service=page.locator(".service-card").filter({has:page.getByRole("heading",{name:"Официальное обращение в деканат"})});
+  await service.getByRole("link",{name:"Оформить заявку"}).click();
+  await expect(page.getByLabel("Тип документа")).toHaveValue("OTHER");
+  await expect(page.getByText("Ответ сотрудника со статусом и историей рассмотрения")).toBeVisible();
+  await page.getByLabel("Адресат").fill("Учебный офис");
+  await page.getByLabel("Цель обращения").fill("Проверка услуги единого окна");
+  await page.getByLabel("Способ получения").selectOption("POSTAL");
+  await expect(page.getByLabel("Почтовый адрес")).toBeVisible();
+  await page.getByRole("button",{name:"Отправить заявку"}).click();
+  await expect(page).toHaveURL(/documents\/new/);
+  await page.getByLabel("Почтовый адрес").fill("690000, Владивосток, Тестовая улица, 1");
+  await page.getByLabel("Телефон",{exact:true}).fill("+79990000000");
+  await page.getByLabel("Подтверждаю, что проверил(а) данные").check();
+  await page.getByRole("button",{name:"Отправить заявку"}).click();
+  await expect(page).toHaveURL(/documents\/[\da-f-]+$/);
+  const id=new URL(page.url()).pathname.split("/").at(-1)!;
+  expect(await db.documentRequest.findUnique({where:{id}})).toMatchObject({type:"OTHER",delivery:"POSTAL",status:"SUBMITTED",contactPhone:"+79990000000"});
 });

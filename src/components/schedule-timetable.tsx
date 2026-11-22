@@ -21,7 +21,7 @@ export async function ScheduleTimetable({audience,searchParams}:{audience:Audien
   const month=calendarLabel(day,{month:"long",year:"numeric"});
   return <>
     <SectionTitle title={teacherId?"Расписание преподавателя":"Расписание"} subtitle={group?`${group.name} · ${month}`:month}/>
-    <div className="schedule-controls">
+    {!teacherId&&<p className="muted">Изменения и отмены вносит деканат с указанием причины. Расписание показывает план занятий, присутствие преподавателя оно не подтверждает. <Link className="text-link" href="/teachers">Найти преподавателя и время консультации →</Link></p>}<div className="schedule-controls">
       <div className="tabs"><Link href={href(day,"day")} aria-current={view==="day"?"page":undefined}>День</Link><Link href={href(day,"week")} aria-current={view==="week"?"page":undefined}>Неделя</Link></div>
       <div className="pager"><Link href={href(addDays(day,view==="week"?-7:-1))} aria-label="Назад"><ChevronLeft size={19}/></Link><Link href={href(today)}>Сегодня</Link><Link href={href(addDays(day,view==="week"?7:1))} aria-label="Вперёд"><ChevronRight size={19}/></Link></div>
     </div>
@@ -42,7 +42,7 @@ export async function ScheduleTimetable({audience,searchParams}:{audience:Audien
             <div className="time-tile"><strong>{timeLabel(event.start)}</strong><small>{timeLabel(event.end)}</small></div>
             <div className="row-content">
               <strong>{event.subject.title}</strong>
-              <small>{event.kind} · {teacherId?event.group.name:instructor}</small>
+              <small>{event.kind} · {teacherId?event.group.name:instructor}</small>{!teacherId&&(event.teacherOverrideId||event.subject.instructorId)&&<Link className="text-link" href={"/teachers/"+(event.teacherOverrideId||event.subject.instructorId)}>Профиль преподавателя</Link>}
               <small>{event.format==="Онлайн"?<Video size={14}/>:<MapPin size={14}/>} {[event.building,event.room,event.format==="Онлайн"?null:event.format].filter(Boolean).join(" · ")}</small>
               {replaced&&<small className="lesson-change-summary">Ведёт другой преподаватель · {instructor}</small>}
               {summary&&<small className="lesson-change-summary">{summary}</small>}

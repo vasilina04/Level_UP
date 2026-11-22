@@ -22,7 +22,7 @@ test("student asks about a checkpoint and the assigned teacher replies",async({p
     await page.getByRole("link",{name:/Сдать лабораторную № 3/}).click();
     await expect(page.getByRole("heading",{name:"Что нужно сделать"})).toBeVisible();
     await expect(page.getByText(/подготовьте SQL-запросы/)).toBeVisible();
-    await page.getByLabel("Вопрос преподавателю").fill(question);
+    await page.getByRole("textbox",{name:"Вопрос преподавателю",exact:true}).fill(question);
     await page.getByRole("button",{name:"Отправить вопрос"}).click();
     await expect(page.getByText(question,{exact:true})).toBeVisible();
     await login(teacher,"teacher1","LevelUpTeacher1!",/\/teacher$/);
@@ -53,5 +53,51 @@ test("student asks about a checkpoint and the assigned teacher replies",async({p
     const messages=await db.checkpointMessage.findMany({where:{assessmentId:point.id,body:{in:[question,answer]}}});
     await db.notification.deleteMany({where:{eventKey:{in:messages.map(message=>"checkpoint-reply:"+message.id)}}});
     await db.checkpointMessage.deleteMany({where:{id:{in:messages.map(message=>message.id)}}});
+  }
+});
+
+
+test("submitted work stays unconfirmed and unrewarded until the teacher records it",async({page,browser,baseURL})=>{
+  const student=await db.user.findUniqueOrThrow({where:{login:"student1"}});
+  const teacherUser=await db.user.findUniqueOrThrow({where:{login:"teacher1"}});
+  const source=await db.subject.findFirstOrThrow({where:{instructorId:teacherUser.id,plan:{isNot:null}},include:{plan:{include:{versions:{orderBy:{number:"desc"},take:1}}}}});
+  const {parsePlan}=await import("../../src/lib/course-data");
+  const plan=parsePlan(source.plan?.versions[0]?.data)!;
+  const title="Проверяемая работа "+randomUUID().slice(0,8);
+  const activity={...plan.activities[0],id:randomUUID(),title,checkpointTitle:title,optional:false};
+  const subject=await db.subject.create({data:{title,teacher:teacherUser.name,instructorId:teacherUser.id,credits:3,color:"violet",enrollments:{create:{studentId:student.id}}},include:{enrollments:true}});
+  const stage=await db.semesterStage.findUniqueOrThrow({where:{position:4}});
+  const point=await db.assessment.create({data:{title,due:new Date(Date.now()+86400000),stageId:stage.id,enrollmentId:subject.enrollments[0].id}});
+  const quest=await db.quest.create({data:{title,description:"Отправьте результаты запросов.",kind:"LAB",studentId:student.id,enrollmentId:point.enrollmentId,assessmentId:point.id,due:point.due}});
+  await db.coursePlan.create({data:{subjectId:subject.id,versions:{create:{number:1,authorId:teacherUser.id,reason:"Тест проверки работы",data:{...plan,title,activities:[activity]}}}}});
+  const text="Результаты SQL и выводы https://example.test/qa-work-"+randomUUID();
+  const teacher=await browser.newPage();
+  const xp=()=>db.xpEvent.count({where:{studentId:student.id,eventKey:"quest:"+quest.id}});
+  try {
+    await login(page,"student1","LevelUpDemo1!",/dashboard$/);
+    await page.goto("/checkpoints/"+point.id);
+    await page.getByLabel("Тип сообщения").selectOption("work");
+    await page.getByLabel("Результат или ссылка на работу").fill(text);
+    await page.getByRole("button",{name:"Отправить на проверку"}).click();
+    await expect(page.getByText(new RegExp("Результаты SQL и выводы"))).toBeVisible();
+    expect((await db.assessment.findUniqueOrThrow({where:{id:point.id}})).passedAt).toBeNull();
+    expect(await xp()).toBe(0);
+    await login(teacher,"teacher1","LevelUpTeacher1!",/\/teacher$/);
+    await teacher.goto("/teacher/checkpoints/"+point.id);
+    await expect(teacher.getByText(/Работа на проверку/)).toBeVisible();
+    await teacher.getByRole("link",{name:"Проверить и выставить результат"}).click();
+    await expect(teacher).toHaveURL(new RegExp("/teacher/courses/"+subject.id+"/results$"));
+    const data={operation:"gradebookActivity",subjectId:subject.id,activityId:activity.id,rows:[{enrollmentId:point.enrollmentId,status:"GRADED",points:activity.max,confirmCheckpoint:"on",expectedAt:null}]};
+    const post=()=>teacher.request.post("/api/academic-planning",{headers:{origin:new URL(baseURL!).origin},data});
+    expect((await post()).status()).toBe(200);
+    expect((await post()).status()).toBe(200);
+    expect(await xp()).toBe(1);
+    await page.reload();
+    await expect(page.getByText("Завершена",{exact:true})).toBeVisible();
+  } finally {
+    await teacher.close();
+    await db.notification.deleteMany({where:{userId:student.id,OR:[{href:{contains:subject.id}},{href:"/checkpoints/"+point.id}]}});
+    await db.xpEvent.deleteMany({where:{studentId:student.id,eventKey:"quest:"+quest.id}});
+    await db.enrollment.delete({where:{id:point.enrollmentId}});
   }
 });
